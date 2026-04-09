@@ -68,6 +68,8 @@ SOURCES := \
     clks/kernel/log.c \
     clks/kernel/limine_requests.c \
     clks/kernel/tty.c \
+    clks/kernel/pmm.c \
+    clks/kernel/heap.c \
     clks/lib/string.c \
     clks/drivers/serial/serial.c \
     clks/drivers/video/framebuffer.c \
