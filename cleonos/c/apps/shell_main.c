@@ -2,9 +2,24 @@
 #include <cleonos_syscall.h>
 
 #define SHELL_CMD_MAX 24ULL
-#define SHELL_ARG_MAX 128ULL
-#define SHELL_LINE_MAX 256ULL
+#define SHELL_ARG_MAX 160ULL
+#define SHELL_LINE_MAX 320ULL
 #define SHELL_CAT_MAX 224ULL
+#define SHELL_SCRIPT_MAX 1024ULL
+
+static u64 shell_strlen(const char *str) {
+    u64 len = 0ULL;
+
+    if (str == (const char *)0) {
+        return 0ULL;
+    }
+
+    while (str[len] != '\0') {
+        len++;
+    }
+
+    return len;
+}
 
 static int shell_streq(const char *left, const char *right) {
     u64 i = 0ULL;
@@ -89,6 +104,35 @@ static void shell_log_hex_prefixed(const char *prefix, u64 value) {
     shell_log_text(line);
 }
 
+static void shell_trim_line(char *line) {
+    u64 start = 0ULL;
+    u64 i = 0ULL;
+    u64 len;
+
+    if (line == (char *)0) {
+        return;
+    }
+
+    while (line[start] != '\0' && shell_is_space(line[start]) != 0) {
+        start++;
+    }
+
+    if (start > 0ULL) {
+        while (line[start + i] != '\0') {
+            line[i] = line[start + i];
+            i++;
+        }
+        line[i] = '\0';
+    }
+
+    len = shell_strlen(line);
+
+    while (len > 0ULL && shell_is_space(line[len - 1ULL]) != 0) {
+        line[len - 1ULL] = '\0';
+        len--;
+    }
+}
+
 static void shell_parse_line(const char *line, char *out_cmd, u64 cmd_size, char *out_arg, u64 arg_size) {
     u64 i = 0ULL;
     u64 cmd_pos = 0ULL;
@@ -126,7 +170,7 @@ static void shell_parse_line(const char *line, char *out_cmd, u64 cmd_size, char
 }
 
 static void shell_cmd_help(void) {
-    shell_log_text("[USER][SHELL] commands: help ls <dir> cat <file> run <elf>");
+    shell_log_text("[USER][SHELL] commands: help ls <dir> cat <file> run <elf> stats");
 }
 
 static void shell_cmd_ls(const char *arg) {
@@ -149,7 +193,7 @@ static void shell_cmd_ls(const char *arg) {
     shell_log_hex_prefixed("[USER][SHELL] ls count: ", count);
 
     for (i = 0ULL; i < count; i++) {
-        char name[96];
+        char name[CLEONOS_FS_NAME_MAX];
 
         name[0] = '\0';
 
@@ -204,15 +248,50 @@ static void shell_cmd_run(const char *arg) {
     }
 }
 
+static void shell_cmd_stats(void) {
+    shell_log_hex_prefixed("[USER][SHELL] fs nodes: ", cleonos_sys_fs_node_count());
+    shell_log_hex_prefixed("[USER][SHELL] task count: ", cleonos_sys_task_count());
+    shell_log_hex_prefixed("[USER][SHELL] service count: ", cleonos_sys_service_count());
+    shell_log_hex_prefixed("[USER][SHELL] service ready: ", cleonos_sys_service_ready_count());
+    shell_log_hex_prefixed("[USER][SHELL] context switches: ", cleonos_sys_context_switches());
+    shell_log_hex_prefixed("[USER][SHELL] kelf count: ", cleonos_sys_kelf_count());
+    shell_log_hex_prefixed("[USER][SHELL] kelf runs: ", cleonos_sys_kelf_runs());
+    shell_log_hex_prefixed("[USER][SHELL] user shell ready: ", cleonos_sys_user_shell_ready());
+    shell_log_hex_prefixed("[USER][SHELL] user exec requested: ", cleonos_sys_user_exec_requested());
+    shell_log_hex_prefixed("[USER][SHELL] user launch tries: ", cleonos_sys_user_launch_tries());
+    shell_log_hex_prefixed("[USER][SHELL] user launch ok: ", cleonos_sys_user_launch_ok());
+    shell_log_hex_prefixed("[USER][SHELL] user launch fail: ", cleonos_sys_user_launch_fail());
+    shell_log_hex_prefixed("[USER][SHELL] exec requests: ", cleonos_sys_exec_request_count());
+    shell_log_hex_prefixed("[USER][SHELL] exec success: ", cleonos_sys_exec_success_count());
+}
+
 static void shell_execute_line(const char *line) {
     char cmd[SHELL_CMD_MAX];
     char arg[SHELL_ARG_MAX];
+    char line_buf[SHELL_LINE_MAX];
+    u64 i = 0ULL;
 
     cmd[0] = '\0';
     arg[0] = '\0';
 
-    shell_log_prefixed("[USER][SHELL]$ ", line);
-    shell_parse_line(line, cmd, (u64)sizeof(cmd), arg, (u64)sizeof(arg));
+    if (line == (const char *)0) {
+        return;
+    }
+
+    while (line[i] != '\0' && i + 1ULL < (u64)sizeof(line_buf)) {
+        line_buf[i] = line[i];
+        i++;
+    }
+
+    line_buf[i] = '\0';
+    shell_trim_line(line_buf);
+
+    if (line_buf[0] == '\0' || line_buf[0] == '#') {
+        return;
+    }
+
+    shell_log_prefixed("[USER][SHELL]$ ", line_buf);
+    shell_parse_line(line_buf, cmd, (u64)sizeof(cmd), arg, (u64)sizeof(arg));
 
     if (shell_streq(cmd, "help") != 0) {
         shell_cmd_help();
@@ -234,12 +313,18 @@ static void shell_execute_line(const char *line) {
         return;
     }
 
+    if (shell_streq(cmd, "stats") != 0) {
+        shell_cmd_stats();
+        return;
+    }
+
     shell_log_prefixed("[USER][SHELL] unknown command: ", cmd);
 }
 
-int cleonos_app_main(void) {
+static void shell_run_default_script(void) {
     static const char *script[] = {
         "help",
+        "stats",
         "ls /",
         "ls /system",
         "cat /README.txt",
@@ -248,15 +333,65 @@ int cleonos_app_main(void) {
     };
     u64 i;
 
-    shell_log_text("[USER][SHELL] shell.elf command framework online");
-    shell_log_hex_prefixed("[USER][SHELL] fs nodes: ", cleonos_sys_fs_node_count());
-    shell_log_hex_prefixed("[USER][SHELL] task count: ", cleonos_sys_task_count());
-
     for (i = 0ULL; i < (u64)(sizeof(script) / sizeof(script[0])); i++) {
         shell_execute_line(script[i]);
     }
+}
 
-    shell_log_hex_prefixed("[USER][SHELL] exec requests: ", cleonos_sys_exec_request_count());
-    shell_log_hex_prefixed("[USER][SHELL] exec success: ", cleonos_sys_exec_success_count());
+static int shell_run_script_file(const char *path) {
+    char script[SHELL_SCRIPT_MAX + 1ULL];
+    char line[SHELL_LINE_MAX];
+    u64 got;
+    u64 i;
+    u64 line_pos = 0ULL;
+
+    if (path == (const char *)0 || path[0] == '\0') {
+        return 0;
+    }
+
+    got = cleonos_sys_fs_read(path, script, SHELL_SCRIPT_MAX);
+
+    if (got == 0ULL) {
+        return 0;
+    }
+
+    if (got > SHELL_SCRIPT_MAX) {
+        got = SHELL_SCRIPT_MAX;
+    }
+
+    script[got] = '\0';
+    shell_log_prefixed("[USER][SHELL] script ", path);
+
+    for (i = 0ULL; i <= got; i++) {
+        char ch = script[i];
+
+        if (ch == '\r') {
+            continue;
+        }
+
+        if (ch == '\n' || ch == '\0') {
+            line[line_pos] = '\0';
+            shell_execute_line(line);
+            line_pos = 0ULL;
+            continue;
+        }
+
+        if (line_pos + 1ULL < (u64)sizeof(line)) {
+            line[line_pos++] = ch;
+        }
+    }
+
+    return 1;
+}
+
+int cleonos_app_main(void) {
+    shell_log_text("[USER][SHELL] shell.elf command framework online");
+
+    if (shell_run_script_file("/shell/init.cmd") == 0) {
+        shell_log_text("[USER][SHELL] /shell/init.cmd missing, using default script");
+        shell_run_default_script();
+    }
+
+    shell_log_text("[USER][SHELL] script done");
     return 0;
 }
