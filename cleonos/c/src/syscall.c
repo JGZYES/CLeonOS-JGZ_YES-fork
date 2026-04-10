@@ -92,3 +92,16 @@ u64 cleonos_sys_user_launch_ok(void) {
 u64 cleonos_sys_user_launch_fail(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_USER_LAUNCH_FAIL, 0ULL, 0ULL, 0ULL);
 }
+
+u64 cleonos_sys_tty_count(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_TTY_COUNT, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_tty_active(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_TTY_ACTIVE, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_tty_switch(u64 tty_index) {
+    return cleonos_syscall(CLEONOS_SYSCALL_TTY_SWITCH, tty_index, 0ULL, 0ULL);
+}
+

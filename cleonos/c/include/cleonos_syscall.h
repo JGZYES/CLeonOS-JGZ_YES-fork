@@ -27,6 +27,9 @@ typedef unsigned long long usize;
 #define CLEONOS_SYSCALL_USER_LAUNCH_TRIES   18ULL
 #define CLEONOS_SYSCALL_USER_LAUNCH_OK      19ULL
 #define CLEONOS_SYSCALL_USER_LAUNCH_FAIL    20ULL
+#define CLEONOS_SYSCALL_TTY_COUNT           21ULL
+#define CLEONOS_SYSCALL_TTY_ACTIVE          22ULL
+#define CLEONOS_SYSCALL_TTY_SWITCH          23ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -49,5 +52,9 @@ u64 cleonos_sys_user_exec_requested(void);
 u64 cleonos_sys_user_launch_tries(void);
 u64 cleonos_sys_user_launch_ok(void);
 u64 cleonos_sys_user_launch_fail(void);
+u64 cleonos_sys_tty_count(void);
+u64 cleonos_sys_tty_active(void);
+u64 cleonos_sys_tty_switch(u64 tty_index);
 
 #endif
+
