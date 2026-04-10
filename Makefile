@@ -92,6 +92,7 @@ C_SOURCES := \
     clks/kernel/fs.c \
     clks/kernel/userland.c \
     clks/kernel/driver.c \
+    clks/kernel/service.c \
     clks/lib/string.c \
     clks/drivers/serial/serial.c \
     clks/drivers/video/framebuffer.c \
