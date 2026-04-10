@@ -96,6 +96,7 @@ C_SOURCES := \
     clks/kernel/driver.c \
     clks/kernel/service.c \
     clks/kernel/kelf.c \
+    clks/kernel/exec.c \
     clks/lib/string.c \
     clks/drivers/serial/serial.c \
     clks/drivers/video/framebuffer.c \
