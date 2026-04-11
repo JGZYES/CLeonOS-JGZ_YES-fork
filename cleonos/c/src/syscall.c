@@ -105,3 +105,14 @@ u64 cleonos_sys_tty_switch(u64 tty_index) {
     return cleonos_syscall(CLEONOS_SYSCALL_TTY_SWITCH, tty_index, 0ULL, 0ULL);
 }
 
+u64 cleonos_sys_tty_write(const char *text, u64 length) {
+    return cleonos_syscall(CLEONOS_SYSCALL_TTY_WRITE, (u64)text, length, 0ULL);
+}
+
+u64 cleonos_sys_tty_write_char(char ch) {
+    return cleonos_syscall(CLEONOS_SYSCALL_TTY_WRITE_CHAR, (u64)(unsigned char)ch, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_kbd_get_char(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_KBD_GET_CHAR, 0ULL, 0ULL, 0ULL);
+}

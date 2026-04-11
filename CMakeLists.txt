@@ -5,12 +5,9 @@ project(CLeonOS NONE)
 set(NO_COLOR 0 CACHE STRING "Disable colored log output when set to 1")
 include("${CMAKE_SOURCE_DIR}/cmake/log.cmake")
 if(NO_COLOR)
-    set(BUILD_LOG_STEP_PREFIX "[STEP]")
-    set(BUILD_LOG_INFO_PREFIX "[INFO]")
+    set(BUILD_LOG_COLOR_OPT --no-color)
 else()
-    string(ASCII 27 BUILD_LOG_ESC)
-    set(BUILD_LOG_STEP_PREFIX "${BUILD_LOG_ESC}[1;35m[STEP]${BUILD_LOG_ESC}[0m")
-    set(BUILD_LOG_INFO_PREFIX "${BUILD_LOG_ESC}[1;36m[INFO]${BUILD_LOG_ESC}[0m")
+    set(BUILD_LOG_COLOR_OPT)
 endif()
 
 set(CC "x86_64-elf-gcc" CACHE STRING "Kernel C compiler")
@@ -274,7 +271,6 @@ function(add_kernel_asm_object SRC OUTPUT_LIST_VAR)
     add_custom_command(
         OUTPUT "${OBJ_PATH}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${OBJ_DIR}"
-        COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} assembling ${SRC}"
         COMMAND ${CC} ${ASFLAGS_COMMON} ${ARCH_CFLAGS} -c "${CMAKE_SOURCE_DIR}/${SRC}" -o "${OBJ_PATH}"
         DEPENDS "${CMAKE_SOURCE_DIR}/${SRC}"
         VERBATIM
@@ -326,7 +322,6 @@ endforeach()
 add_custom_command(
     OUTPUT "${USER_RUST_LIB}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${USER_LIB_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} building rust user lib"
     COMMAND ${RUSTC} --crate-type staticlib -C panic=abort -O "${CMAKE_SOURCE_DIR}/cleonos/rust/src/lib.rs" -o "${USER_RUST_LIB}"
     DEPENDS "${CMAKE_SOURCE_DIR}/cleonos/rust/src/lib.rs"
     VERBATIM
@@ -413,7 +408,7 @@ add_custom_target(userapps DEPENDS ${USER_APP_OUTPUTS})
 add_custom_command(
     TARGET userapps
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_INFO_PREFIX} user elf apps ready"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --cyan "[INFO] user elf apps ready"
 )
 
 file(GLOB_RECURSE RAMDISK_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/ramdisk/*")
@@ -434,7 +429,6 @@ endforeach()
 
 add_custom_command(
     OUTPUT "${RAMDISK_ROOT_STAMP}"
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} staging ramdisk root -> ${RAMDISK_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${RAMDISK_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${RAMDISK_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/ramdisk" "${RAMDISK_ROOT}"
@@ -451,7 +445,6 @@ add_dependencies(ramdisk-root userapps)
 add_custom_command(
     OUTPUT "${RAMDISK_IMAGE}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${BUILD_ROOT}"
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} packing ramdisk -> ${RAMDISK_IMAGE}"
     COMMAND ${TAR} -C "${RAMDISK_ROOT}" -cf "${RAMDISK_IMAGE}" .
     DEPENDS "${RAMDISK_ROOT_STAMP}"
     VERBATIM
@@ -500,11 +493,10 @@ add_custom_target(setup-limine
 add_dependencies(setup-limine setup-tools)
 
 add_custom_target(setup DEPENDS setup-tools setup-limine)
-add_custom_command(TARGET setup POST_BUILD COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_INFO_PREFIX} environment ready")
+add_custom_command(TARGET setup POST_BUILD COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --cyan "[INFO] environment ready")
 
 add_custom_command(
     OUTPUT "${ISO_IMAGE}"
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} assembling iso root"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${ISO_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${ISO_ROOT}/boot/limine"
     COMMAND ${CMAKE_COMMAND} -E copy "${KERNEL_ELF}" "${ISO_ROOT}/boot/clks_kernel.elf"
@@ -514,7 +506,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy "${LIMINE_BIN_DIR_ABS}/limine-bios-cd.bin" "${ISO_ROOT}/boot/limine/limine-bios-cd.bin"
     COMMAND ${CMAKE_COMMAND} -E copy "${LIMINE_BIN_DIR_ABS}/limine-uefi-cd.bin" "${ISO_ROOT}/boot/limine/limine-uefi-cd.bin"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build"
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} building iso -> ${ISO_IMAGE}"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] building iso -> ${ISO_IMAGE}"
     COMMAND ${XORRISO} -as mkisofs
         -b boot/limine/limine-bios-cd.bin
         -no-emul-boot
@@ -526,9 +518,9 @@ add_custom_command(
         --protective-msdos-label
         "${ISO_ROOT}"
         -o "${ISO_IMAGE}"
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} installing limine boot sectors"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] installing limine boot sectors"
     COMMAND "${LIMINE_BIN_DIR_ABS}/limine" bios-install "${ISO_IMAGE}"
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_INFO_PREFIX} iso ready: ${ISO_IMAGE}"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --cyan "[INFO] iso ready: ${ISO_IMAGE}"
     DEPENDS "${KERNEL_ELF}" "${RAMDISK_IMAGE}" "${CMAKE_SOURCE_DIR}/configs/limine.conf"
     VERBATIM
 )
@@ -537,29 +529,29 @@ add_custom_target(iso ALL DEPENDS "${ISO_IMAGE}")
 add_dependencies(iso setup-tools setup-limine kernel ramdisk)
 
 add_custom_target(run
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} launching qemu run"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] launching qemu run"
     COMMAND ${QEMU_X86_64} -M q35 -m 1024M -cdrom "${ISO_IMAGE}" -serial stdio
     DEPENDS iso
     USES_TERMINAL
 )
 
 add_custom_target(debug
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} launching qemu debug (-s -S)"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] launching qemu debug (-s -S)"
     COMMAND ${QEMU_X86_64} -M q35 -m 1024M -cdrom "${ISO_IMAGE}" -serial stdio -s -S
     DEPENDS iso
     USES_TERMINAL
 )
 
 add_custom_target(clean-x86
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} cleaning ${BUILD_ROOT}"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] cleaning ${BUILD_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${BUILD_ROOT}"
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_INFO_PREFIX} clean done"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --cyan "[INFO] clean done"
 )
 
 add_custom_target(clean-all
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_STEP_PREFIX} cleaning build"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] cleaning build"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_SOURCE_DIR}/build"
-    COMMAND ${CMAKE_COMMAND} -E echo "${BUILD_LOG_INFO_PREFIX} clean-all done"
+    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --cyan "[INFO] clean-all done"
 )
 
 add_custom_target(cleonos-help
