@@ -33,6 +33,19 @@ typedef unsigned long long usize;
 #define CLEONOS_SYSCALL_TTY_WRITE           24ULL
 #define CLEONOS_SYSCALL_TTY_WRITE_CHAR      25ULL
 #define CLEONOS_SYSCALL_KBD_GET_CHAR        26ULL
+#define CLEONOS_SYSCALL_FS_STAT_TYPE        27ULL
+#define CLEONOS_SYSCALL_FS_STAT_SIZE        28ULL
+#define CLEONOS_SYSCALL_FS_MKDIR            29ULL
+#define CLEONOS_SYSCALL_FS_WRITE            30ULL
+#define CLEONOS_SYSCALL_FS_APPEND           31ULL
+#define CLEONOS_SYSCALL_FS_REMOVE           32ULL
+#define CLEONOS_SYSCALL_LOG_JOURNAL_COUNT   33ULL
+#define CLEONOS_SYSCALL_LOG_JOURNAL_READ    34ULL
+#define CLEONOS_SYSCALL_KBD_BUFFERED        35ULL
+#define CLEONOS_SYSCALL_KBD_PUSHED          36ULL
+#define CLEONOS_SYSCALL_KBD_POPPED          37ULL
+#define CLEONOS_SYSCALL_KBD_DROPPED         38ULL
+#define CLEONOS_SYSCALL_KBD_HOTKEY_SWITCHES 39ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -61,5 +74,18 @@ u64 cleonos_sys_tty_switch(u64 tty_index);
 u64 cleonos_sys_tty_write(const char *text, u64 length);
 u64 cleonos_sys_tty_write_char(char ch);
 u64 cleonos_sys_kbd_get_char(void);
+u64 cleonos_sys_fs_stat_type(const char *path);
+u64 cleonos_sys_fs_stat_size(const char *path);
+u64 cleonos_sys_fs_mkdir(const char *path);
+u64 cleonos_sys_fs_write(const char *path, const char *data, u64 size);
+u64 cleonos_sys_fs_append(const char *path, const char *data, u64 size);
+u64 cleonos_sys_fs_remove(const char *path);
+u64 cleonos_sys_log_journal_count(void);
+u64 cleonos_sys_log_journal_read(u64 index_from_oldest, char *out_line, u64 out_size);
+u64 cleonos_sys_kbd_buffered(void);
+u64 cleonos_sys_kbd_pushed(void);
+u64 cleonos_sys_kbd_popped(void);
+u64 cleonos_sys_kbd_dropped(void);
+u64 cleonos_sys_kbd_hotkey_switches(void);
 
 #endif

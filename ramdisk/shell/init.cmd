@@ -3,9 +3,3 @@
 
 help
 stats
-ls /
-ls /shell
-ls /system
-cat /README.txt
-run /hello.elf
-stats

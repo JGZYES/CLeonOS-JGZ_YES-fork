@@ -73,6 +73,19 @@ SYS_TTY_SWITCH = 23
 SYS_TTY_WRITE = 24
 SYS_TTY_WRITE_CHAR = 25
 SYS_KBD_GET_CHAR = 26
+SYS_FS_STAT_TYPE = 27
+SYS_FS_STAT_SIZE = 28
+SYS_FS_MKDIR = 29
+SYS_FS_WRITE = 30
+SYS_FS_APPEND = 31
+SYS_FS_REMOVE = 32
+SYS_LOG_JOURNAL_COUNT = 33
+SYS_LOG_JOURNAL_READ = 34
+SYS_KBD_BUFFERED = 35
+SYS_KBD_PUSHED = 36
+SYS_KBD_POPPED = 37
+SYS_KBD_DROPPED = 38
+SYS_KBD_HOTKEY_SWITCHES = 39
 
 
 def u64(value: int) -> int:
@@ -126,21 +139,56 @@ class SharedKernelState:
     tty_active: int = 0
     kbd_queue: Deque[int] = field(default_factory=collections.deque)
     kbd_lock: threading.Lock = field(default_factory=threading.Lock)
+    kbd_queue_cap: int = 256
+    kbd_drop_count: int = 0
+    kbd_push_count: int = 0
+    kbd_pop_count: int = 0
+    kbd_hotkey_switches: int = 0
+    log_journal_cap: int = 256
+    log_journal: Deque[str] = field(default_factory=lambda: collections.deque(maxlen=256))
+    fs_write_max: int = 65536
 
     def timer_ticks(self) -> int:
         return (time.monotonic_ns() - self.start_ns) // 1_000_000
 
     def push_key(self, key: int) -> None:
         with self.kbd_lock:
-            if len(self.kbd_queue) >= 1024:
+            if len(self.kbd_queue) >= self.kbd_queue_cap:
                 self.kbd_queue.popleft()
+                self.kbd_drop_count = u64(self.kbd_drop_count + 1)
             self.kbd_queue.append(key & 0xFF)
+            self.kbd_push_count = u64(self.kbd_push_count + 1)
 
     def pop_key(self) -> Optional[int]:
         with self.kbd_lock:
             if not self.kbd_queue:
                 return None
+            self.kbd_pop_count = u64(self.kbd_pop_count + 1)
             return self.kbd_queue.popleft()
+
+    def buffered_count(self) -> int:
+        with self.kbd_lock:
+            return len(self.kbd_queue)
+
+    def log_journal_push(self, text: str) -> None:
+        if text is None:
+            return
+
+        normalized = text.replace("\r", "")
+        lines = normalized.split("\n")
+
+        for line in lines:
+            if len(line) > 255:
+                line = line[:255]
+            self.log_journal.append(line)
+
+    def log_journal_count(self) -> int:
+        return len(self.log_journal)
+
+    def log_journal_read(self, index_from_oldest: int) -> Optional[str]:
+        if index_from_oldest < 0 or index_from_oldest >= len(self.log_journal):
+            return None
+        return list(self.log_journal)[index_from_oldest]
 
 
 class InputPump:
@@ -321,7 +369,9 @@ class CLeonOSWineNative:
     def _dispatch_syscall(self, uc: Uc, sid: int, arg0: int, arg1: int, arg2: int) -> int:
         if sid == SYS_LOG_WRITE:
             data = self._read_guest_bytes(uc, arg0, arg1)
-            self._host_write(data.decode("utf-8", errors="replace"))
+            text = data.decode("utf-8", errors="replace")
+            self._host_write(text)
+            self.state.log_journal_push(text)
             return len(data)
         if sid == SYS_TIMER_TICKS:
             return self.state.timer_ticks()
@@ -371,7 +421,7 @@ class CLeonOSWineNative:
             if arg0 >= self.state.tty_count:
                 return u64_neg1()
             self.state.tty_active = int(arg0)
-            return 0
+            return self.state.tty_active
         if sid == SYS_TTY_WRITE:
             data = self._read_guest_bytes(uc, arg0, arg1)
             self._host_write(data.decode("utf-8", errors="replace"))
@@ -382,10 +432,36 @@ class CLeonOSWineNative:
                 self._host_write("\b \b")
             else:
                 self._host_write(ch)
-            return 0
+            return 1
         if sid == SYS_KBD_GET_CHAR:
             key = self.state.pop_key()
             return u64_neg1() if key is None else key
+        if sid == SYS_FS_STAT_TYPE:
+            return self._fs_stat_type(uc, arg0)
+        if sid == SYS_FS_STAT_SIZE:
+            return self._fs_stat_size(uc, arg0)
+        if sid == SYS_FS_MKDIR:
+            return self._fs_mkdir(uc, arg0)
+        if sid == SYS_FS_WRITE:
+            return self._fs_write(uc, arg0, arg1, arg2)
+        if sid == SYS_FS_APPEND:
+            return self._fs_append(uc, arg0, arg1, arg2)
+        if sid == SYS_FS_REMOVE:
+            return self._fs_remove(uc, arg0)
+        if sid == SYS_LOG_JOURNAL_COUNT:
+            return self.state.log_journal_count()
+        if sid == SYS_LOG_JOURNAL_READ:
+            return self._log_journal_read(uc, arg0, arg1, arg2)
+        if sid == SYS_KBD_BUFFERED:
+            return self.state.buffered_count()
+        if sid == SYS_KBD_PUSHED:
+            return self.state.kbd_push_count
+        if sid == SYS_KBD_POPPED:
+            return self.state.kbd_pop_count
+        if sid == SYS_KBD_DROPPED:
+            return self.state.kbd_drop_count
+        if sid == SYS_KBD_HOTKEY_SWITCHES:
+            return self.state.kbd_hotkey_switches
 
         return u64_neg1()
 
@@ -602,6 +678,132 @@ class CLeonOSWineNative:
         if not data:
             return 0
         return len(data) if self._write_guest_bytes(uc, out_ptr, data) else 0
+
+    def _fs_stat_type(self, uc: Uc, path_ptr: int) -> int:
+        path = self._read_guest_cstring(uc, path_ptr)
+        host_path = self._guest_to_host(path, must_exist=True)
+        if host_path is None:
+            return u64_neg1()
+        if host_path.is_dir():
+            return 2
+        if host_path.is_file():
+            return 1
+        return u64_neg1()
+
+    def _fs_stat_size(self, uc: Uc, path_ptr: int) -> int:
+        path = self._read_guest_cstring(uc, path_ptr)
+        host_path = self._guest_to_host(path, must_exist=True)
+        if host_path is None:
+            return u64_neg1()
+        if host_path.is_dir():
+            return 0
+        if host_path.is_file():
+            try:
+                return host_path.stat().st_size
+            except Exception:
+                return u64_neg1()
+        return u64_neg1()
+
+    @staticmethod
+    def _guest_path_is_under_temp(path: str) -> bool:
+        return path == "/temp" or path.startswith("/temp/")
+
+    def _fs_mkdir(self, uc: Uc, path_ptr: int) -> int:
+        path = self._normalize_guest_path(self._read_guest_cstring(uc, path_ptr))
+        if not self._guest_path_is_under_temp(path):
+            return 0
+
+        host_path = self._guest_to_host(path, must_exist=False)
+        if host_path is None:
+            return 0
+
+        if host_path.exists() and host_path.is_file():
+            return 0
+
+        try:
+            host_path.mkdir(parents=True, exist_ok=True)
+            return 1
+        except Exception:
+            return 0
+
+    def _fs_write_common(self, uc: Uc, path_ptr: int, data_ptr: int, size: int, append_mode: bool) -> int:
+        path = self._normalize_guest_path(self._read_guest_cstring(uc, path_ptr))
+
+        if not self._guest_path_is_under_temp(path) or path == "/temp":
+            return 0
+
+        if size < 0 or size > self.state.fs_write_max:
+            return 0
+
+        host_path = self._guest_to_host(path, must_exist=False)
+        if host_path is None:
+            return 0
+
+        if host_path.exists() and host_path.is_dir():
+            return 0
+
+        data = b""
+        if size > 0:
+            if data_ptr == 0:
+                return 0
+            data = self._read_guest_bytes(uc, data_ptr, size)
+            if len(data) != int(size):
+                return 0
+
+        try:
+            host_path.parent.mkdir(parents=True, exist_ok=True)
+            mode = "ab" if append_mode else "wb"
+            with host_path.open(mode) as fh:
+                if data:
+                    fh.write(data)
+            return 1
+        except Exception:
+            return 0
+
+    def _fs_write(self, uc: Uc, path_ptr: int, data_ptr: int, size: int) -> int:
+        return self._fs_write_common(uc, path_ptr, data_ptr, size, append_mode=False)
+
+    def _fs_append(self, uc: Uc, path_ptr: int, data_ptr: int, size: int) -> int:
+        return self._fs_write_common(uc, path_ptr, data_ptr, size, append_mode=True)
+
+    def _fs_remove(self, uc: Uc, path_ptr: int) -> int:
+        path = self._normalize_guest_path(self._read_guest_cstring(uc, path_ptr))
+
+        if not self._guest_path_is_under_temp(path) or path == "/temp":
+            return 0
+
+        host_path = self._guest_to_host(path, must_exist=True)
+        if host_path is None:
+            return 0
+
+        try:
+            if host_path.is_dir():
+                if any(host_path.iterdir()):
+                    return 0
+                host_path.rmdir()
+            else:
+                host_path.unlink()
+            return 1
+        except Exception:
+            return 0
+
+    def _log_journal_read(self, uc: Uc, index_from_oldest: int, out_ptr: int, out_size: int) -> int:
+        if out_ptr == 0 or out_size == 0:
+            return 0
+
+        line = self.state.log_journal_read(int(index_from_oldest))
+        if line is None:
+            return 0
+
+        encoded = line.encode("utf-8", errors="replace")
+        max_payload = int(out_size) - 1
+        if max_payload < 0:
+            return 0
+
+        if len(encoded) > max_payload:
+            encoded = encoded[:max_payload]
+
+        return 1 if self._write_guest_bytes(uc, out_ptr, encoded + b"\x00") else 0
 
     def _exec_path(self, uc: Uc, path_ptr: int) -> int:
         path = self._read_guest_cstring(uc, path_ptr)

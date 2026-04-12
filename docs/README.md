@@ -24,6 +24,10 @@
 - `stage25.md`
 - `stage26.md`
 
+- `syscall.md` (syscall ABI reference)
+
 ## Notes
 - Stage docs use a fixed template: goal, implementation, acceptance criteria, build targets, QEMU command, and debugging notes.
 - Stages 16~19 are currently not documented in this folder; add them later using the same template to keep history continuous.
+
+

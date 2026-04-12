@@ -364,12 +364,34 @@ foreach(SRC IN LISTS USER_APP_MAIN_SOURCES)
     list(APPEND USER_APP_NAMES "${_app_name}")
 
     add_user_c_object("${SRC}" _user_obj)
+
+    set(_app_specific_objs)
+    file(GLOB _app_specific_abs CONFIGURE_DEPENDS
+        "${CMAKE_SOURCE_DIR}/cleonos/c/apps/${_app_name}_*.c"
+        "${CMAKE_SOURCE_DIR}/cleonos/c/apps/${_app_name}/*.c"
+    )
+    foreach(_extra_abs IN LISTS _app_specific_abs)
+        file(RELATIVE_PATH _extra_rel "${CMAKE_SOURCE_DIR}" "${_extra_abs}")
+
+        if(_extra_rel STREQUAL "${SRC}")
+            continue()
+        endif()
+
+        if(_extra_rel MATCHES "_kmain\\.c$")
+            continue()
+        endif()
+
+        add_user_c_object("${_extra_rel}" _extra_obj)
+        list(APPEND _app_specific_objs "${_extra_obj}")
+    endforeach()
+    list(REMOVE_DUPLICATES _app_specific_objs)
+
     set(_app_out "${USER_APP_DIR}/${_app_name}.elf")
     add_custom_command(
         OUTPUT "${_app_out}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${USER_APP_DIR}"
-        COMMAND ${USER_LD} ${USER_LDFLAGS} -o "${_app_out}" ${USER_COMMON_OBJECTS} "${_user_obj}" "${USER_RUST_LIB}"
-        DEPENDS ${USER_COMMON_OBJECTS} "${_user_obj}" "${USER_RUST_LIB}" "${USER_LINKER_SCRIPT}"
+        COMMAND ${USER_LD} ${USER_LDFLAGS} -o "${_app_out}" ${USER_COMMON_OBJECTS} "${_user_obj}" ${_app_specific_objs} "${USER_RUST_LIB}"
+        DEPENDS ${USER_COMMON_OBJECTS} "${_user_obj}" ${_app_specific_objs} "${USER_RUST_LIB}" "${USER_LINKER_SCRIPT}"
         VERBATIM
     )
 

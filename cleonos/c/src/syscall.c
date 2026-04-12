@@ -116,3 +116,55 @@ u64 cleonos_sys_tty_write_char(char ch) {
 u64 cleonos_sys_kbd_get_char(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_KBD_GET_CHAR, 0ULL, 0ULL, 0ULL);
 }
+
+u64 cleonos_sys_fs_stat_type(const char *path) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FS_STAT_TYPE, (u64)path, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_fs_stat_size(const char *path) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FS_STAT_SIZE, (u64)path, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_fs_mkdir(const char *path) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FS_MKDIR, (u64)path, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_fs_write(const char *path, const char *data, u64 size) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FS_WRITE, (u64)path, (u64)data, size);
+}
+
+u64 cleonos_sys_fs_append(const char *path, const char *data, u64 size) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FS_APPEND, (u64)path, (u64)data, size);
+}
+
+u64 cleonos_sys_fs_remove(const char *path) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FS_REMOVE, (u64)path, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_log_journal_count(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_LOG_JOURNAL_COUNT, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_log_journal_read(u64 index_from_oldest, char *out_line, u64 out_size) {
+    return cleonos_syscall(CLEONOS_SYSCALL_LOG_JOURNAL_READ, index_from_oldest, (u64)out_line, out_size);
+}
+
+u64 cleonos_sys_kbd_buffered(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_KBD_BUFFERED, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_kbd_pushed(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_KBD_PUSHED, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_kbd_popped(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_KBD_POPPED, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_kbd_dropped(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_KBD_DROPPED, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_kbd_hotkey_switches(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_KBD_HOTKEY_SWITCHES, 0ULL, 0ULL, 0ULL);
+}
