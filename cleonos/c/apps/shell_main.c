@@ -242,6 +242,18 @@ static int shell_resolve_exec_path(const char *arg, char *out_path, u64 out_size
     return 1;
 }
 
+static int shell_path_is_under_system(const char *path) {
+    if (path == (const char *)0) {
+        return 0;
+    }
+
+    if (path[0] != '/' || path[1] != 's' || path[2] != 'y' || path[3] != 's' || path[4] != 't' || path[5] != 'e' || path[6] != 'm') {
+        return 0;
+    }
+
+    return (path[7] == '\0' || path[7] == '/') ? 1 : 0;
+}
+
 static void shell_cmd_help(void) {
     shell_writeln("commands:");
     shell_writeln("  help");
@@ -319,12 +331,19 @@ static void shell_cmd_exec(const char *arg) {
         return;
     }
 
+    if (shell_path_is_under_system(path) != 0) {
+        shell_writeln("exec: /system/*.elf is kernel-mode (KELF), not user-exec");
+        return;
+    }
+
     status = cleonos_sys_exec_path(path);
 
-    if (status == 0ULL) {
+    if (status == (u64)-1) {
+        shell_writeln("exec: request failed");
+    } else if (status == 0ULL) {
         shell_writeln("exec: request accepted");
     } else {
-        shell_writeln("exec: request failed");
+        shell_writeln("exec: returned non-zero status");
     }
 }
 

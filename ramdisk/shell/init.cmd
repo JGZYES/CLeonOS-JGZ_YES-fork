@@ -7,6 +7,5 @@ ls /
 ls /shell
 ls /system
 cat /README.txt
-run /system/elfrunner.elf
-run /system/memc.elf
+run /hello.elf
 stats

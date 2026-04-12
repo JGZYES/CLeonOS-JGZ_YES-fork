@@ -12,6 +12,7 @@
 - Updated CMake ramdisk placement rules:
   - `hello.elf` -> `/hello.elf`
 - Simplified user Rust library back to shared helper export (`cleonos_rust_guarded_len`).
+- Added x86_64 exec stack bridge (`clks_exec_call_on_stack_x86_64`) so ELF entry runs on a dedicated execution stack instead of inheriting deep shell call stack.
 
 ## Acceptance Criteria
 - No `elfloader.elf` is generated or packed.
@@ -19,6 +20,7 @@
 - In kernel shell:
   - `elfloader` loads and executes `/hello.elf`, then returns status.
   - `elfloader /path/to/app.elf` works for other absolute/relative paths.
+- `exec /shell/shell.elf` can take foreground control without immediate stack-chain crash.
 
 ## Build Targets
 - `make userapps`
@@ -33,5 +35,4 @@
 - If `elfloader` reports `file missing`, check ramdisk root packaging for `/hello.elf`.
 - If it reports `invalid elf64`, verify user app link script and ELF output format.
 - If it reports `exec failed`, inspect `EXEC` channel logs for load/entry/return status.
-- `hello.elf` is supported in current synchronous exec mode.
-- `/shell/shell.elf` is intentionally blocked in synchronous mode (interactive loop requires process/task context switching stage).
+- For long-running interactive ELF (such as `shell.elf`), no `RUN RETURNED` log is expected unless the app exits.
