@@ -398,12 +398,16 @@ static int ush_cmd_exit(ush_state *sh, const char *arg) {
 }
 
 static int ush_cmd_clear(void) {
-    u64 i;
+    ush_write("\x1B[2J\x1B[H");
+    return 1;
+}
 
-    for (i = 0ULL; i < USH_CLEAR_LINES; i++) {
-        ush_write_char('\n');
-    }
-
+static int ush_cmd_ansi(void) {
+    ush_writeln("\x1B[1;36mansi color demo\x1B[0m");
+    ush_writeln("  \x1B[30mblack\x1B[0m \x1B[31mred\x1B[0m \x1B[32mgreen\x1B[0m \x1B[33myellow\x1B[0m");
+    ush_writeln("  \x1B[34mblue\x1B[0m \x1B[35mmagenta\x1B[0m \x1B[36mcyan\x1B[0m \x1B[37mwhite\x1B[0m");
+    ush_writeln("  \x1B[90mbright-black\x1B[0m \x1B[91mbright-red\x1B[0m \x1B[92mbright-green\x1B[0m \x1B[93mbright-yellow\x1B[0m");
+    ush_writeln("  \x1B[94mbright-blue\x1B[0m \x1B[95mbright-magenta\x1B[0m \x1B[96mbright-cyan\x1B[0m \x1B[97mbright-white\x1B[0m");
     return 1;
 }
 
@@ -874,6 +878,8 @@ void ush_execute_line(ush_state *sh, const char *line) {
         success = ush_cmd_exit(sh, arg);
     } else if (ush_streq(cmd, "clear") != 0 || ush_streq(cmd, "cls") != 0) {
         success = ush_cmd_clear();
+    } else if (ush_streq(cmd, "ansi") != 0 || ush_streq(cmd, "color") != 0) {
+        success = ush_cmd_ansi();
     } else if (ush_streq(cmd, "memstat") != 0) {
         success = ush_cmd_memstat();
     } else if (ush_streq(cmd, "fsstat") != 0) {

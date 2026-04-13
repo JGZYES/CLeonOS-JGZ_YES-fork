@@ -5,10 +5,12 @@ int cleonos_app_main(void) {
     char line[USH_LINE_MAX];
 
     ush_init_state(&sh);
-    ush_writeln("[USER][SHELL] interactive framework online");
+    ush_writeln("\x1B[92m[USER][SHELL]\x1B[0m interactive framework online");
 
-    if (ush_run_script_file(&sh, "/shell/init.cmd") == 0) {
-        ush_writeln("[USER][SHELL] /shell/init.cmd missing");
+    if (ush_run_script_file(&sh, "/shell/init.cmd") == 0 &&
+        ush_run_script_file(&sh, "/shell/INIT.CMD") == 0 &&
+        ush_run_script_file(&sh, "/SHELL/INIT.CMD") == 0) {
+        ush_writeln("\x1B[33m[USER][SHELL]\x1B[0m init script not found, continue interactive mode");
     }
 
     for (;;) {
