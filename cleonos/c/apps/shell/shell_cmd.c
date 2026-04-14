@@ -866,6 +866,10 @@ void ush_execute_line(ush_state *sh, const char *line) {
     ush_parse_line(line_buf, cmd, (u64)sizeof(cmd), arg, (u64)sizeof(arg));
     ush_trim_line(arg);
 
+    if (ush_try_exec_external(sh, cmd, arg, &success) != 0) {
+        goto finalize_stats;
+    }
+
     if (ush_streq(cmd, "help") != 0) {
         success = ush_cmd_help();
     } else if (ush_streq(cmd, "ls") != 0 || ush_streq(cmd, "dir") != 0) {
@@ -938,6 +942,7 @@ void ush_execute_line(ush_state *sh, const char *line) {
         ush_writeln("unknown command; type 'help'");
     }
 
+finalize_stats:
     sh->cmd_total++;
 
     if (success != 0) {

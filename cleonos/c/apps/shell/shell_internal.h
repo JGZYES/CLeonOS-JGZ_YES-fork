@@ -22,6 +22,11 @@ typedef long long i64;
 #define USH_KEY_END     ((char)0x06)
 #define USH_KEY_DELETE  ((char)0x07)
 
+#define USH_CMD_CTX_PATH "/temp/.ush_cmd_ctx.bin"
+#define USH_CMD_RET_PATH "/temp/.ush_cmd_ret.bin"
+#define USH_CMD_RET_FLAG_CWD  0x1ULL
+#define USH_CMD_RET_FLAG_EXIT 0x2ULL
+
 typedef struct ush_state {
     char line[USH_LINE_MAX];
     u64 line_len;
@@ -44,6 +49,18 @@ typedef struct ush_state {
     int exit_requested;
     u64 exit_code;
 } ush_state;
+
+typedef struct ush_cmd_ctx {
+    char cmd[USH_CMD_MAX];
+    char arg[USH_ARG_MAX];
+    char cwd[USH_PATH_MAX];
+} ush_cmd_ctx;
+
+typedef struct ush_cmd_ret {
+    u64 flags;
+    u64 exit_code;
+    char cwd[USH_PATH_MAX];
+} ush_cmd_ret;
 
 void ush_init_state(ush_state *sh);
 
@@ -72,5 +89,14 @@ int ush_path_is_under_system(const char *path);
 void ush_read_line(ush_state *sh, char *out_line, u64 out_size);
 int ush_run_script_file(ush_state *sh, const char *path);
 void ush_execute_line(ush_state *sh, const char *line);
+void ush_set_external_dispatch(int enabled);
+
+int ush_command_ctx_write(const char *cmd, const char *arg, const char *cwd);
+int ush_command_ctx_read(ush_cmd_ctx *out_ctx);
+void ush_command_ret_reset(void);
+int ush_command_ret_write(const ush_cmd_ret *ret);
+int ush_command_ret_read(ush_cmd_ret *out_ret);
+int ush_command_program_main(const char *command_name);
+int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *out_success);
 
 #endif

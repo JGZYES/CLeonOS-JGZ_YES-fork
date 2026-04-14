@@ -347,6 +347,12 @@ set(RAMDISK_DRIVER_APPS)
 set(RAMDISK_SYSTEM_APPS)
 set(RAMDISK_ROOT_APPS)
 
+set(USER_SHELL_COMMAND_APPS
+    help ls cat pwd cd exec pid spawn wait sleep yield
+    shutdown restart exit clear ansi memstat fsstat taskstat userstat
+    shstat stats tty dmesg kbdstat mkdir touch write append cp mv rm
+)
+
 foreach(SRC IN LISTS USER_APP_MAIN_SOURCES)
     get_filename_component(_stem "${SRC}" NAME_WE)
     string(REGEX REPLACE "_main$" "" _app_name "${_stem}")
@@ -370,6 +376,14 @@ foreach(SRC IN LISTS USER_APP_MAIN_SOURCES)
         "${CMAKE_SOURCE_DIR}/cleonos/c/apps/${_app_name}_*.c"
         "${CMAKE_SOURCE_DIR}/cleonos/c/apps/${_app_name}/*.c"
     )
+
+    list(FIND USER_SHELL_COMMAND_APPS "${_app_name}" _shell_cmd_idx)
+    if(NOT _shell_cmd_idx EQUAL -1)
+        file(GLOB _shell_cmd_shared_abs CONFIGURE_DEPENDS
+            "${CMAKE_SOURCE_DIR}/cleonos/c/apps/shell/*.c"
+        )
+        list(APPEND _app_specific_abs ${_shell_cmd_shared_abs})
+    endif()
     foreach(_extra_abs IN LISTS _app_specific_abs)
         file(RELATIVE_PATH _extra_rel "${CMAKE_SOURCE_DIR}" "${_extra_abs}")
 
