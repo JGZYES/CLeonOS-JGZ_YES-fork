@@ -26,6 +26,7 @@ jobs:
             git \
             tar \
             xorriso \
+            mtools \
             clang \
             lld \
             llvm \
