@@ -21,6 +21,9 @@ typedef long long i64;
 #define USH_KEY_HOME    ((char)0x05)
 #define USH_KEY_END     ((char)0x06)
 #define USH_KEY_DELETE  ((char)0x07)
+#define USH_KEY_SELECT_ALL ((char)0x10)
+#define USH_KEY_COPY       ((char)0x11)
+#define USH_KEY_PASTE      ((char)0x12)
 
 #define USH_CMD_CTX_PATH "/temp/.ush_cmd_ctx.bin"
 #define USH_CMD_RET_PATH "/temp/.ush_cmd_ret.bin"
@@ -100,3 +103,4 @@ int ush_command_program_main(const char *command_name);
 int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *out_success);
 
 #endif
+
