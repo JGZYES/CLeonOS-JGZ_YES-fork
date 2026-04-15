@@ -203,6 +203,16 @@ list(REMOVE_DUPLICATES ASM_SOURCES)
 list(SORT C_SOURCES)
 list(SORT ASM_SOURCES)
 
+file(GLOB_RECURSE KERNEL_INC_SOURCES_ABS CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/clks/**/*.inc"
+)
+list(SORT KERNEL_INC_SOURCES_ABS)
+
+file(GLOB_RECURSE USER_INC_SOURCES_ABS CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/cleonos/**/*.inc"
+)
+list(SORT USER_INC_SOURCES_ABS)
+
 if(NOT C_SOURCES)
     cl_log_error("no kernel C sources found in clks/")
 endif()
@@ -248,12 +258,13 @@ function(add_kernel_c_object SRC OUTPUT_LIST_VAR)
     string(REGEX REPLACE "\\.c$" ".o" OBJ_REL "${SRC}")
     set(OBJ_PATH "${OBJ_ROOT}/${OBJ_REL}")
     get_filename_component(OBJ_DIR "${OBJ_PATH}" DIRECTORY)
+    set(_deps "${CMAKE_SOURCE_DIR}/${SRC}" ${KERNEL_INC_SOURCES_ABS})
 
     add_custom_command(
         OUTPUT "${OBJ_PATH}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${OBJ_DIR}"
         COMMAND ${CC} ${CFLAGS_COMMON} ${ARCH_CFLAGS} -c "${CMAKE_SOURCE_DIR}/${SRC}" -o "${OBJ_PATH}"
-        DEPENDS "${CMAKE_SOURCE_DIR}/${SRC}"
+        DEPENDS ${_deps}
         VERBATIM
     )
 
@@ -264,12 +275,13 @@ function(add_kernel_asm_object SRC OUTPUT_LIST_VAR)
     string(REGEX REPLACE "\\.S$" ".o" OBJ_REL "${SRC}")
     set(OBJ_PATH "${OBJ_ROOT}/${OBJ_REL}")
     get_filename_component(OBJ_DIR "${OBJ_PATH}" DIRECTORY)
+    set(_deps "${CMAKE_SOURCE_DIR}/${SRC}" ${KERNEL_INC_SOURCES_ABS})
 
     add_custom_command(
         OUTPUT "${OBJ_PATH}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${OBJ_DIR}"
         COMMAND ${CC} ${ASFLAGS_COMMON} ${ARCH_CFLAGS} -c "${CMAKE_SOURCE_DIR}/${SRC}" -o "${OBJ_PATH}"
-        DEPENDS "${CMAKE_SOURCE_DIR}/${SRC}"
+        DEPENDS ${_deps}
         VERBATIM
     )
 
@@ -280,12 +292,13 @@ function(add_user_c_object SRC OUTPUT_VAR)
     string(REGEX REPLACE "\\.c$" ".o" OBJ_REL "${SRC}")
     set(OBJ_PATH "${USER_OBJ_ROOT}/${OBJ_REL}")
     get_filename_component(OBJ_DIR "${OBJ_PATH}" DIRECTORY)
+    set(_deps "${CMAKE_SOURCE_DIR}/${SRC}" ${USER_INC_SOURCES_ABS})
 
     add_custom_command(
         OUTPUT "${OBJ_PATH}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${OBJ_DIR}"
         COMMAND ${USER_CC} ${USER_CFLAGS} -c "${CMAKE_SOURCE_DIR}/${SRC}" -o "${OBJ_PATH}"
-        DEPENDS "${CMAKE_SOURCE_DIR}/${SRC}"
+        DEPENDS ${_deps}
         VERBATIM
     )
 
