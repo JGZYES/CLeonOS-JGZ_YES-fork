@@ -24,6 +24,10 @@ typedef long long i64;
 #define USH_KEY_SELECT_ALL ((char)0x10)
 #define USH_KEY_COPY       ((char)0x11)
 #define USH_KEY_PASTE      ((char)0x12)
+#define USH_KEY_SHIFT_LEFT ((char)0x13)
+#define USH_KEY_SHIFT_RIGHT ((char)0x14)
+#define USH_KEY_SHIFT_HOME ((char)0x15)
+#define USH_KEY_SHIFT_END  ((char)0x16)
 
 #define USH_CMD_CTX_PATH "/temp/.ush_cmd_ctx.bin"
 #define USH_CMD_RET_PATH "/temp/.ush_cmd_ret.bin"

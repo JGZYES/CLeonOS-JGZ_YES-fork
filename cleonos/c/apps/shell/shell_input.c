@@ -5,11 +5,15 @@ static u64 ush_input_clipboard_len = 0ULL;
 static u64 ush_input_sel_start = 0ULL;
 static u64 ush_input_sel_end = 0ULL;
 static int ush_input_sel_active = 0;
+static u64 ush_input_sel_anchor = 0ULL;
+static int ush_input_sel_anchor_valid = 0;
 
 static void ush_input_selection_clear(void) {
     ush_input_sel_active = 0;
     ush_input_sel_start = 0ULL;
     ush_input_sel_end = 0ULL;
+    ush_input_sel_anchor = 0ULL;
+    ush_input_sel_anchor_valid = 0;
 }
 
 static void ush_input_selection_select_all(const ush_state *sh) {
@@ -21,8 +25,40 @@ static void ush_input_selection_select_all(const ush_state *sh) {
     ush_input_sel_active = 1;
     ush_input_sel_start = 0ULL;
     ush_input_sel_end = sh->line_len;
+    ush_input_sel_anchor = 0ULL;
+    ush_input_sel_anchor_valid = 1;
 }
 
+static void ush_input_selection_update_from_anchor(const ush_state *sh) {
+    u64 anchor;
+
+    if (sh == (const ush_state *)0 || ush_input_sel_anchor_valid == 0) {
+        ush_input_sel_active = 0;
+        return;
+    }
+
+    anchor = ush_input_sel_anchor;
+    if (anchor > sh->line_len) {
+        anchor = sh->line_len;
+    }
+
+    if (sh->cursor == anchor) {
+        ush_input_sel_active = 0;
+        ush_input_sel_start = anchor;
+        ush_input_sel_end = anchor;
+        return;
+    }
+
+    ush_input_sel_active = 1;
+
+    if (sh->cursor < anchor) {
+        ush_input_sel_start = sh->cursor;
+        ush_input_sel_end = anchor;
+    } else {
+        ush_input_sel_start = anchor;
+        ush_input_sel_end = sh->cursor;
+    }
+}
 static int ush_input_selection_has_range(const ush_state *sh, u64 *out_start, u64 *out_end) {
     u64 start;
     u64 end;
@@ -427,6 +463,59 @@ void ush_read_line(ush_state *sh, char *out_line, u64 out_size) {
             continue;
         }
 
+        if (ch == USH_KEY_SHIFT_LEFT) {
+            if (ush_input_sel_anchor_valid == 0) {
+                ush_input_sel_anchor = sh->cursor;
+                ush_input_sel_anchor_valid = 1;
+            }
+
+            if (sh->cursor > 0ULL) {
+                sh->cursor--;
+            }
+
+            ush_input_selection_update_from_anchor(sh);
+            ush_render_line(sh);
+            continue;
+        }
+
+        if (ch == USH_KEY_SHIFT_RIGHT) {
+            if (ush_input_sel_anchor_valid == 0) {
+                ush_input_sel_anchor = sh->cursor;
+                ush_input_sel_anchor_valid = 1;
+            }
+
+            if (sh->cursor < sh->line_len) {
+                sh->cursor++;
+            }
+
+            ush_input_selection_update_from_anchor(sh);
+            ush_render_line(sh);
+            continue;
+        }
+
+        if (ch == USH_KEY_SHIFT_HOME) {
+            if (ush_input_sel_anchor_valid == 0) {
+                ush_input_sel_anchor = sh->cursor;
+                ush_input_sel_anchor_valid = 1;
+            }
+
+            sh->cursor = 0ULL;
+            ush_input_selection_update_from_anchor(sh);
+            ush_render_line(sh);
+            continue;
+        }
+
+        if (ch == USH_KEY_SHIFT_END) {
+            if (ush_input_sel_anchor_valid == 0) {
+                ush_input_sel_anchor = sh->cursor;
+                ush_input_sel_anchor_valid = 1;
+            }
+
+            sh->cursor = sh->line_len;
+            ush_input_selection_update_from_anchor(sh);
+            ush_render_line(sh);
+            continue;
+        }
         if (ch == USH_KEY_UP) {
             ush_input_selection_clear();
             ush_history_up(sh);
@@ -553,3 +642,4 @@ void ush_read_line(ush_state *sh, char *out_line, u64 out_size) {
         }
     }
 }
+
