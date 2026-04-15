@@ -3,6 +3,22 @@
 #define USH_DMESG_DEFAULT   64ULL
 #define USH_DMESG_LINE_MAX 256ULL
 #define USH_COPY_MAX      65536U
+#define USH_PIPELINE_MAX_STAGES 8ULL
+#define USH_PIPE_CAPTURE_MAX   USH_COPY_MAX
+
+typedef struct ush_pipeline_stage {
+    char text[USH_LINE_MAX];
+    char cmd[USH_CMD_MAX];
+    char arg[USH_ARG_MAX];
+    char redirect_path[USH_PATH_MAX];
+    int redirect_mode; /* 0: none, 1: >, 2: >> */
+} ush_pipeline_stage;
+
+static const char *ush_pipeline_stdin_text = (const char *)0;
+static u64 ush_pipeline_stdin_len = 0ULL;
+static char ush_pipeline_capture_a[USH_PIPE_CAPTURE_MAX + 1U];
+static char ush_pipeline_capture_b[USH_PIPE_CAPTURE_MAX + 1U];
+
 
 static int ush_path_is_under_temp(const char *path) {
     if (path == (const char *)0) {
@@ -111,7 +127,8 @@ static int ush_cmd_help(void) {
     ush_writeln("commands:");
     ush_writeln("  help");
     ush_writeln("  ls [-l] [-R] [path]");
-    ush_writeln("  cat <file>");
+    ush_writeln("  cat [file]        (reads pipeline input when file omitted)");
+    ush_writeln("  grep [-n] <pattern> [file]");
     ush_writeln("  pwd");
     ush_writeln("  cd [dir]");
     ush_writeln("  exec|run <path|name>");
@@ -123,8 +140,8 @@ static int ush_cmd_help(void) {
     ush_writeln("  kbdstat");
     ush_writeln("  mkdir <dir>      (/temp only)");
     ush_writeln("  touch <file>     (/temp only)");
-    ush_writeln("  write <file> <text>   (/temp only)");
-    ush_writeln("  append <file> <text>  (/temp only)");
+    ush_writeln("  write <file> <text>   (/temp only, or from pipeline)");
+    ush_writeln("  append <file> <text>  (/temp only, or from pipeline)");
     ush_writeln("  cp <src> <dst>   (dst /temp only)");
     ush_writeln("  mv <src> <dst>   (/temp only)");
     ush_writeln("  rm <path>        (/temp only)");
@@ -136,6 +153,8 @@ static int ush_cmd_help(void) {
     ush_writeln("  shutdown / restart");
     ush_writeln("  exit [code]");
     ush_writeln("  rusttest / panic / elfloader (kernel shell only)");
+    ush_writeln("pipeline/redirection: cmd1 | cmd2 | cmd3 > /temp/out.txt");
+    ush_writeln("redirection append:   cmd >> /temp/out.txt");
     ush_writeln("edit keys: Left/Right, Home/End, Up/Down history");
     return 1;
 }
@@ -439,6 +458,11 @@ static int ush_cmd_cat(const ush_state *sh, const char *arg) {
     u64 got;
 
     if (arg == (const char *)0 || arg[0] == '\0') {
+        if (ush_pipeline_stdin_text != (const char *)0 && ush_pipeline_stdin_len > 0ULL) {
+            ush_write(ush_pipeline_stdin_text);
+            return 1;
+        }
+
         ush_writeln("cat: file path required");
         return 0;
     }
@@ -486,6 +510,207 @@ static int ush_cmd_cat(const ush_state *sh, const char *arg) {
     return 1;
 }
 
+static void ush_grep_write_u64_dec(u64 value) {
+    char tmp[32];
+    u64 len = 0ULL;
+
+    if (value == 0ULL) {
+        ush_write_char('0');
+        return;
+    }
+
+    while (value > 0ULL && len < (u64)sizeof(tmp)) {
+        tmp[len++] = (char)('0' + (value % 10ULL));
+        value /= 10ULL;
+    }
+
+    while (len > 0ULL) {
+        len--;
+        ush_write_char(tmp[len]);
+    }
+}
+
+static int ush_grep_line_has_pattern(const char *line, u64 line_len, const char *pattern, u64 pattern_len) {
+    u64 i;
+
+    if (line == (const char *)0 || pattern == (const char *)0) {
+        return 0;
+    }
+
+    if (pattern_len == 0ULL) {
+        return 1;
+    }
+
+    if (pattern_len > line_len) {
+        return 0;
+    }
+
+    for (i = 0ULL; i + pattern_len <= line_len; i++) {
+        u64 j = 0ULL;
+
+        while (j < pattern_len && line[i + j] == pattern[j]) {
+            j++;
+        }
+
+        if (j == pattern_len) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static u64 ush_grep_emit_matches(const char *input, u64 input_len, const char *pattern, int with_line_number) {
+    u64 matches = 0ULL;
+    u64 line_no = 1ULL;
+    u64 start = 0ULL;
+    u64 i;
+    u64 pattern_len;
+
+    if (input == (const char *)0 || pattern == (const char *)0) {
+        return 0ULL;
+    }
+
+    pattern_len = ush_strlen(pattern);
+
+    for (i = 0ULL; i <= input_len; i++) {
+        if (i == input_len || input[i] == '\n') {
+            u64 line_len = i - start;
+
+            if (ush_grep_line_has_pattern(&input[start], line_len, pattern, pattern_len) != 0) {
+                u64 j;
+
+                matches++;
+
+                if (with_line_number != 0) {
+                    ush_grep_write_u64_dec(line_no);
+                    ush_write(":");
+                }
+
+                for (j = 0ULL; j < line_len; j++) {
+                    ush_write_char(input[start + j]);
+                }
+
+                ush_write_char('\n');
+            }
+
+            start = i + 1ULL;
+            line_no++;
+        }
+    }
+
+    return matches;
+}
+
+static int ush_cmd_grep(const ush_state *sh, const char *arg) {
+    char first[USH_PATH_MAX];
+    char second[USH_PATH_MAX];
+    char third[USH_PATH_MAX];
+    char path[USH_PATH_MAX];
+    const char *rest = "";
+    const char *rest2 = "";
+    const char *pattern = (const char *)0;
+    const char *file_arg = (const char *)0;
+    const char *input = (const char *)0;
+    u64 input_len = 0ULL;
+    u64 size;
+    u64 got;
+    int with_line_number = 0;
+    static char file_buf[USH_COPY_MAX + 1U];
+
+    if (sh == (const ush_state *)0 || arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("grep: usage grep [-n] <pattern> [file]");
+        return 0;
+    }
+
+    if (ush_split_first_and_rest(arg, first, (u64)sizeof(first), &rest) == 0) {
+        ush_writeln("grep: usage grep [-n] <pattern> [file]");
+        return 0;
+    }
+
+    if (ush_streq(first, "-n") != 0) {
+        with_line_number = 1;
+
+        if (ush_split_first_and_rest(rest, second, (u64)sizeof(second), &rest2) == 0) {
+            ush_writeln("grep: usage grep [-n] <pattern> [file]");
+            return 0;
+        }
+
+        pattern = second;
+        rest = rest2;
+    } else {
+        pattern = first;
+    }
+
+    if (rest != (const char *)0 && rest[0] != '\0') {
+        if (ush_split_first_and_rest(rest, third, (u64)sizeof(third), &rest2) == 0) {
+            ush_writeln("grep: usage grep [-n] <pattern> [file]");
+            return 0;
+        }
+
+        file_arg = third;
+
+        if (rest2 != (const char *)0 && rest2[0] != '\0') {
+            ush_writeln("grep: usage grep [-n] <pattern> [file]");
+            return 0;
+        }
+    }
+
+    if (pattern == (const char *)0 || pattern[0] == '\0') {
+        ush_writeln("grep: pattern required");
+        return 0;
+    }
+
+    if (file_arg != (const char *)0) {
+        if (ush_resolve_path(sh, file_arg, path, (u64)sizeof(path)) == 0) {
+            ush_writeln("grep: invalid path");
+            return 0;
+        }
+
+        if (cleonos_sys_fs_stat_type(path) != 1ULL) {
+            ush_writeln("grep: file not found");
+            return 0;
+        }
+
+        size = cleonos_sys_fs_stat_size(path);
+
+        if (size == (u64)-1) {
+            ush_writeln("grep: failed to stat file");
+            return 0;
+        }
+
+        if (size > (u64)USH_COPY_MAX) {
+            ush_writeln("grep: file too large for user buffer");
+            return 0;
+        }
+
+        if (size == 0ULL) {
+            return 1;
+        }
+
+        got = cleonos_sys_fs_read(path, file_buf, size);
+
+        if (got == 0ULL || got != size) {
+            ush_writeln("grep: read failed");
+            return 0;
+        }
+
+        file_buf[got] = '\0';
+        input = file_buf;
+        input_len = got;
+    } else {
+        if (ush_pipeline_stdin_text == (const char *)0) {
+            ush_writeln("grep: file path required (or pipeline input)");
+            return 0;
+        }
+
+        input = ush_pipeline_stdin_text;
+        input_len = ush_pipeline_stdin_len;
+    }
+
+    (void)ush_grep_emit_matches(input, input_len, pattern, with_line_number);
+    return 1;
+}
 static int ush_cmd_pwd(const ush_state *sh) {
     ush_writeln(sh->cwd);
     return 1;
@@ -989,7 +1214,7 @@ static int ush_cmd_touch(const ush_state *sh, const char *arg) {
 static int ush_cmd_write(const ush_state *sh, const char *arg) {
     char path_arg[USH_PATH_MAX];
     char abs_path[USH_PATH_MAX];
-    const char *payload;
+    const char *payload = (const char *)0;
     u64 payload_len;
 
     if (arg == (const char *)0 || arg[0] == '\0') {
@@ -1012,7 +1237,16 @@ static int ush_cmd_write(const ush_state *sh, const char *arg) {
         return 0;
     }
 
-    payload_len = ush_strlen(payload);
+    if (payload == (const char *)0 || payload[0] == '\0') {
+        if (ush_pipeline_stdin_text == (const char *)0) {
+            ush_writeln("write: usage write <file> <text>");
+            return 0;
+        }
+        payload = ush_pipeline_stdin_text;
+        payload_len = ush_pipeline_stdin_len;
+    } else {
+        payload_len = ush_strlen(payload);
+    }
 
     if (cleonos_sys_fs_write(abs_path, payload, payload_len) == 0ULL) {
         ush_writeln("write: failed");
@@ -1025,7 +1259,7 @@ static int ush_cmd_write(const ush_state *sh, const char *arg) {
 static int ush_cmd_append(const ush_state *sh, const char *arg) {
     char path_arg[USH_PATH_MAX];
     char abs_path[USH_PATH_MAX];
-    const char *payload;
+    const char *payload = (const char *)0;
     u64 payload_len;
 
     if (arg == (const char *)0 || arg[0] == '\0') {
@@ -1048,7 +1282,16 @@ static int ush_cmd_append(const ush_state *sh, const char *arg) {
         return 0;
     }
 
-    payload_len = ush_strlen(payload);
+    if (payload == (const char *)0 || payload[0] == '\0') {
+        if (ush_pipeline_stdin_text == (const char *)0) {
+            ush_writeln("append: usage append <file> <text>");
+            return 0;
+        }
+        payload = ush_pipeline_stdin_text;
+        payload_len = ush_pipeline_stdin_len;
+    } else {
+        payload_len = ush_strlen(payload);
+    }
 
     if (cleonos_sys_fs_append(abs_path, payload, payload_len) == 0ULL) {
         ush_writeln("append: failed");
@@ -1214,35 +1457,35 @@ static int ush_cmd_not_supported(const char *name, const char *why) {
     return 0;
 }
 
-void ush_execute_line(ush_state *sh, const char *line) {
-    char line_buf[USH_LINE_MAX];
-    char cmd[USH_CMD_MAX];
-    char arg[USH_ARG_MAX];
-    u64 i = 0ULL;
+static int ush_execute_single_command(ush_state *sh,
+                                      const char *cmd,
+                                      const char *arg,
+                                      int allow_external,
+                                      int *out_known,
+                                      int *out_success) {
     int known = 1;
     int success = 0;
 
-    if (sh == (ush_state *)0 || line == (const char *)0) {
-        return;
+    if (out_known != (int *)0) {
+        *out_known = 1;
     }
 
-    while (line[i] != '\0' && i + 1ULL < (u64)sizeof(line_buf)) {
-        line_buf[i] = line[i];
-        i++;
+    if (out_success != (int *)0) {
+        *out_success = 0;
     }
 
-    line_buf[i] = '\0';
-    ush_trim_line(line_buf);
-
-    if (line_buf[0] == '\0' || line_buf[0] == '#') {
-        return;
+    if (sh == (ush_state *)0 || cmd == (const char *)0 || cmd[0] == '\0') {
+        if (out_known != (int *)0) {
+            *out_known = 0;
+        }
+        return 0;
     }
 
-    ush_parse_line(line_buf, cmd, (u64)sizeof(cmd), arg, (u64)sizeof(arg));
-    ush_trim_line(arg);
-
-    if (ush_try_exec_external(sh, cmd, arg, &success) != 0) {
-        goto finalize_stats;
+    if (allow_external != 0 && ush_try_exec_external(sh, cmd, arg, &success) != 0) {
+        if (out_success != (int *)0) {
+            *out_success = success;
+        }
+        return 1;
     }
 
     if (ush_streq(cmd, "help") != 0) {
@@ -1251,6 +1494,8 @@ void ush_execute_line(ush_state *sh, const char *line) {
         success = ush_cmd_ls(sh, arg);
     } else if (ush_streq(cmd, "cat") != 0) {
         success = ush_cmd_cat(sh, arg);
+    } else if (ush_streq(cmd, "grep") != 0) {
+        success = ush_cmd_grep(sh, arg);
     } else if (ush_streq(cmd, "pwd") != 0) {
         success = ush_cmd_pwd(sh);
     } else if (ush_streq(cmd, "cd") != 0) {
@@ -1319,7 +1564,320 @@ void ush_execute_line(ush_state *sh, const char *line) {
         ush_writeln("unknown command; type 'help'");
     }
 
-finalize_stats:
+    if (out_known != (int *)0) {
+        *out_known = known;
+    }
+
+    if (out_success != (int *)0) {
+        *out_success = success;
+    }
+
+    return 1;
+}
+
+static void ush_pipeline_set_stdin(const char *text, u64 len) {
+    ush_pipeline_stdin_text = text;
+    ush_pipeline_stdin_len = len;
+}
+
+static int ush_pipeline_has_meta(const char *line) {
+    u64 i = 0ULL;
+
+    if (line == (const char *)0) {
+        return 0;
+    }
+
+    while (line[i] != '\0') {
+        if (line[i] == '|' || line[i] == '>') {
+            return 1;
+        }
+        i++;
+    }
+
+    return 0;
+}
+
+static int ush_pipeline_parse_stage(ush_pipeline_stage *stage, const char *segment_text) {
+    char work[USH_LINE_MAX];
+    char path_part[USH_PATH_MAX];
+    const char *path_rest = "";
+    u64 i;
+    i64 op_pos = -1;
+    int op_mode = 0;
+
+    if (stage == (ush_pipeline_stage *)0 || segment_text == (const char *)0) {
+        return 0;
+    }
+
+    ush_copy(work, (u64)sizeof(work), segment_text);
+    ush_trim_line(work);
+
+    if (work[0] == '\0') {
+        return 0;
+    }
+
+    for (i = 0ULL; work[i] != '\0'; i++) {
+        if (work[i] == '>') {
+            if (op_pos >= 0) {
+                ush_writeln("pipe: multiple redirections in one stage are not supported");
+                return 0;
+            }
+
+            op_pos = (i64)i;
+
+            if (work[i + 1ULL] == '>') {
+                op_mode = 2;
+                i++;
+            } else {
+                op_mode = 1;
+            }
+        }
+    }
+
+    stage->redirect_mode = 0;
+    stage->redirect_path[0] = '\0';
+
+    if (op_pos >= 0) {
+        char *path_src;
+
+        work[(u64)op_pos] = '\0';
+        path_src = &work[(u64)op_pos + ((op_mode == 2) ? 2ULL : 1ULL)];
+
+        ush_trim_line(work);
+        ush_trim_line(path_src);
+
+        if (path_src[0] == '\0') {
+            ush_writeln("pipe: redirection path required");
+            return 0;
+        }
+
+        if (ush_split_first_and_rest(path_src, path_part, (u64)sizeof(path_part), &path_rest) == 0) {
+            ush_writeln("pipe: redirection path required");
+            return 0;
+        }
+
+        if (path_rest != (const char *)0 && path_rest[0] != '\0') {
+            ush_writeln("pipe: redirection path cannot contain spaces");
+            return 0;
+        }
+
+        stage->redirect_mode = op_mode;
+        ush_copy(stage->redirect_path, (u64)sizeof(stage->redirect_path), path_part);
+    }
+
+    ush_copy(stage->text, (u64)sizeof(stage->text), work);
+    ush_parse_line(work, stage->cmd, (u64)sizeof(stage->cmd), stage->arg, (u64)sizeof(stage->arg));
+    ush_trim_line(stage->arg);
+
+    if (stage->cmd[0] == '\0') {
+        ush_writeln("pipe: empty command stage");
+        return 0;
+    }
+
+    return 1;
+}
+
+static int ush_pipeline_parse(const char *line,
+                              ush_pipeline_stage *stages,
+                              u64 max_stages,
+                              u64 *out_stage_count) {
+    char segment[USH_LINE_MAX];
+    u64 i = 0ULL;
+    u64 seg_pos = 0ULL;
+    u64 stage_count = 0ULL;
+
+    if (line == (const char *)0 || stages == (ush_pipeline_stage *)0 || max_stages == 0ULL || out_stage_count == (u64 *)0) {
+        return 0;
+    }
+
+    *out_stage_count = 0ULL;
+
+    for (;;) {
+        char ch = line[i];
+
+        if (ch == '|' || ch == '\0') {
+            segment[seg_pos] = '\0';
+
+            if (stage_count >= max_stages) {
+                ush_writeln("pipe: too many stages");
+                return 0;
+            }
+
+            if (ush_pipeline_parse_stage(&stages[stage_count], segment) == 0) {
+                return 0;
+            }
+
+            stage_count++;
+            seg_pos = 0ULL;
+
+            if (ch == '\0') {
+                break;
+            }
+
+            i++;
+            continue;
+        }
+
+        if (seg_pos + 1ULL >= (u64)sizeof(segment)) {
+            ush_writeln("pipe: stage text too long");
+            return 0;
+        }
+
+        segment[seg_pos++] = ch;
+        i++;
+    }
+
+    *out_stage_count = stage_count;
+    return 1;
+}
+
+static int ush_pipeline_write_redirect(const ush_state *sh, const ush_pipeline_stage *stage, const char *data, u64 len) {
+    char abs_path[USH_PATH_MAX];
+    u64 ok;
+
+    if (sh == (const ush_state *)0 || stage == (const ush_pipeline_stage *)0) {
+        return 0;
+    }
+
+    if (stage->redirect_mode == 0) {
+        return 1;
+    }
+
+    if (ush_resolve_path(sh, stage->redirect_path, abs_path, (u64)sizeof(abs_path)) == 0) {
+        ush_writeln("redirect: invalid path");
+        return 0;
+    }
+
+    if (stage->redirect_mode == 1) {
+        ok = cleonos_sys_fs_write(abs_path, data, len);
+    } else {
+        ok = cleonos_sys_fs_append(abs_path, data, len);
+    }
+
+    if (ok == 0ULL) {
+        ush_writeln("redirect: write failed");
+        return 0;
+    }
+
+    return 1;
+}
+
+static int ush_execute_pipeline(ush_state *sh,
+                                const char *line,
+                                int *out_known,
+                                int *out_success) {
+    ush_pipeline_stage stages[USH_PIPELINE_MAX_STAGES];
+    u64 stage_count = 0ULL;
+    u64 i;
+    const char *pipe_in = (const char *)0;
+    u64 pipe_in_len = 0ULL;
+    char *capture_out = ush_pipeline_capture_a;
+    u64 capture_len = 0ULL;
+    int known = 1;
+    int success = 1;
+
+    if (out_known != (int *)0) {
+        *out_known = 1;
+    }
+
+    if (out_success != (int *)0) {
+        *out_success = 0;
+    }
+
+    if (ush_pipeline_parse(line, stages, USH_PIPELINE_MAX_STAGES, &stage_count) == 0) {
+        return 0;
+    }
+
+    for (i = 0ULL; i < stage_count; i++) {
+        int stage_known = 1;
+        int stage_success = 0;
+        int mirror_to_tty = ((i + 1ULL) == stage_count && stages[i].redirect_mode == 0) ? 1 : 0;
+
+        if (i + 1ULL < stage_count && stages[i].redirect_mode != 0) {
+            ush_writeln("pipe: redirection is only supported on final stage");
+            known = 1;
+            success = 0;
+            break;
+        }
+
+        ush_pipeline_set_stdin(pipe_in, pipe_in_len);
+        ush_output_capture_begin(capture_out, (u64)USH_PIPE_CAPTURE_MAX + 1ULL, mirror_to_tty);
+        (void)ush_execute_single_command(sh, stages[i].cmd, stages[i].arg, 0, &stage_known, &stage_success);
+        capture_len = ush_output_capture_end();
+
+        if (ush_output_capture_truncated() != 0) {
+            ush_writeln("[pipe] captured output truncated");
+        }
+
+        if (stage_known == 0) {
+            known = 0;
+        }
+
+        if (stage_success == 0) {
+            success = 0;
+            break;
+        }
+
+        if (stages[i].redirect_mode != 0) {
+            if (ush_pipeline_write_redirect(sh, &stages[i], capture_out, capture_len) == 0) {
+                success = 0;
+                break;
+            }
+        }
+
+        pipe_in = capture_out;
+        pipe_in_len = capture_len;
+        capture_out = (capture_out == ush_pipeline_capture_a) ? ush_pipeline_capture_b : ush_pipeline_capture_a;
+    }
+
+    ush_pipeline_set_stdin((const char *)0, 0ULL);
+
+    if (out_known != (int *)0) {
+        *out_known = known;
+    }
+
+    if (out_success != (int *)0) {
+        *out_success = success;
+    }
+
+    return 1;
+}
+
+void ush_execute_line(ush_state *sh, const char *line) {
+    char line_buf[USH_LINE_MAX];
+    char cmd[USH_CMD_MAX];
+    char arg[USH_ARG_MAX];
+    u64 i = 0ULL;
+    int known = 1;
+    int success = 0;
+
+    if (sh == (ush_state *)0 || line == (const char *)0) {
+        return;
+    }
+
+    while (line[i] != '\0' && i + 1ULL < (u64)sizeof(line_buf)) {
+        line_buf[i] = line[i];
+        i++;
+    }
+
+    line_buf[i] = '\0';
+    ush_trim_line(line_buf);
+
+    if (line_buf[0] == '\0' || line_buf[0] == '#') {
+        return;
+    }
+
+    if (ush_pipeline_has_meta(line_buf) != 0) {
+        if (ush_execute_pipeline(sh, line_buf, &known, &success) == 0) {
+            known = 1;
+            success = 0;
+        }
+    } else {
+        ush_parse_line(line_buf, cmd, (u64)sizeof(cmd), arg, (u64)sizeof(arg));
+        ush_trim_line(arg);
+        (void)ush_execute_single_command(sh, cmd, arg, 1, &known, &success);
+    }
+
     sh->cmd_total++;
 
     if (success != 0) {
@@ -1332,6 +1890,3 @@ finalize_stats:
         sh->cmd_unknown++;
     }
 }
-
-
-

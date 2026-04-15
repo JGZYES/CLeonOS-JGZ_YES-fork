@@ -219,6 +219,82 @@ void ush_parse_line(const char *line, char *out_cmd, u64 cmd_size, char *out_arg
     out_arg[arg_pos] = '\0';
 }
 
+static char *ush_out_capture_buffer = (char *)0;
+static u64 ush_out_capture_capacity = 0ULL;
+static u64 ush_out_capture_length = 0ULL;
+static int ush_out_capture_active = 0;
+static int ush_out_capture_mirror_tty = 1;
+static int ush_out_capture_truncated = 0;
+
+static void ush_output_capture_append(const char *text, u64 len) {
+    u64 writable;
+    u64 i;
+
+    if (ush_out_capture_active == 0 || text == (const char *)0 || len == 0ULL) {
+        return;
+    }
+
+    if (ush_out_capture_buffer == (char *)0 || ush_out_capture_capacity == 0ULL) {
+        ush_out_capture_truncated = 1;
+        return;
+    }
+
+    if (ush_out_capture_length + 1ULL >= ush_out_capture_capacity) {
+        ush_out_capture_truncated = 1;
+        return;
+    }
+
+    writable = (ush_out_capture_capacity - 1ULL) - ush_out_capture_length;
+
+    if (len > writable) {
+        len = writable;
+        ush_out_capture_truncated = 1;
+    }
+
+    for (i = 0ULL; i < len; i++) {
+        ush_out_capture_buffer[ush_out_capture_length + i] = text[i];
+    }
+
+    ush_out_capture_length += len;
+    ush_out_capture_buffer[ush_out_capture_length] = '\0';
+}
+
+void ush_output_capture_begin(char *buffer, u64 buffer_size, int mirror_to_tty) {
+    ush_out_capture_buffer = buffer;
+    ush_out_capture_capacity = buffer_size;
+    ush_out_capture_length = 0ULL;
+    ush_out_capture_active = 1;
+    ush_out_capture_mirror_tty = (mirror_to_tty != 0) ? 1 : 0;
+    ush_out_capture_truncated = 0;
+
+    if (ush_out_capture_buffer != (char *)0 && ush_out_capture_capacity > 0ULL) {
+        ush_out_capture_buffer[0] = '\0';
+    }
+}
+
+u64 ush_output_capture_end(void) {
+    u64 captured = ush_out_capture_length;
+
+    if (ush_out_capture_buffer != (char *)0 && ush_out_capture_capacity > 0ULL) {
+        if (ush_out_capture_length >= ush_out_capture_capacity) {
+            ush_out_capture_length = ush_out_capture_capacity - 1ULL;
+        }
+        ush_out_capture_buffer[ush_out_capture_length] = '\0';
+    }
+
+    ush_out_capture_buffer = (char *)0;
+    ush_out_capture_capacity = 0ULL;
+    ush_out_capture_length = 0ULL;
+    ush_out_capture_active = 0;
+    ush_out_capture_mirror_tty = 1;
+
+    return captured;
+}
+
+int ush_output_capture_truncated(void) {
+    return ush_out_capture_truncated;
+}
+
 void ush_write(const char *text) {
     u64 len;
 
@@ -232,10 +308,26 @@ void ush_write(const char *text) {
         return;
     }
 
+    if (ush_out_capture_active != 0) {
+        ush_output_capture_append(text, len);
+
+        if (ush_out_capture_mirror_tty == 0) {
+            return;
+        }
+    }
+
     (void)cleonos_sys_tty_write(text, len);
 }
 
 void ush_write_char(char ch) {
+    if (ush_out_capture_active != 0) {
+        ush_output_capture_append(&ch, 1ULL);
+
+        if (ush_out_capture_mirror_tty == 0) {
+            return;
+        }
+    }
+
     (void)cleonos_sys_tty_write_char(ch);
 }
 

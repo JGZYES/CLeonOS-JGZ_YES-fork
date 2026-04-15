@@ -85,6 +85,9 @@ void ush_parse_line(const char *line, char *out_cmd, u64 cmd_size, char *out_arg
 void ush_write(const char *text);
 void ush_write_char(char ch);
 void ush_writeln(const char *text);
+void ush_output_capture_begin(char *buffer, u64 buffer_size, int mirror_to_tty);
+u64 ush_output_capture_end(void);
+int ush_output_capture_truncated(void);
 void ush_prompt(const ush_state *sh);
 void ush_write_hex_u64(u64 value);
 void ush_print_kv_hex(const char *label, u64 value);
