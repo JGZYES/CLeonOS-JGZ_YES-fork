@@ -36,6 +36,14 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 失败时多数接口返回 `0xFFFFFFFFFFFFFFFF`（即 `u64` 的 `-1`）。
 - 部分接口失败返回 `0`（例如 `FS_READ` / `FS_WRITE` / `FS_APPEND` / `FS_REMOVE` / `LOG_JOURNAL_READ`）。
 
+进程退出状态补充（`EXEC_PATH*` / `WAITPID`）：
+
+- 普通退出：返回值即用户程序退出码。
+- 异常终止：返回值最高位为 `1`（`1<<63`），并编码：
+- bits `7:0` = signal
+- bits `15:8` = CPU exception vector
+- bits `31:16` = exception error code 低 16 位
+
 ## 3. 当前实现中的长度/路径限制
 
 以下限制由内核 `clks/kernel/syscall.c` 当前实现决定：
@@ -52,7 +60,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 
 - `FS_MKDIR` / `FS_WRITE` / `FS_APPEND` / `FS_REMOVE` 仅允许 `/temp` 树下路径。
 
-## 4. Syscall 列表（0~50）
+## 4. Syscall 列表（0~60）
 
 ### 0 `CLEONOS_SYSCALL_LOG_WRITE`
 
@@ -371,6 +379,73 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 返回：当前实现固定返回 `1`
 - 说明：立即停止当前音频输出。
 
+### 51 `CLEONOS_SYSCALL_EXEC_PATHV`
+
+- 参数：
+- `arg0`: `const char *path`
+- `arg1`: `const char *argv_line`（可为 `0`）
+- `arg2`: `const char *env_line`（可为 `0`）
+- 返回：
+- `-1`：请求失败
+- 其他：目标程序退出状态
+- 说明：`argv_line` 以空白分词，`env_line` 以 `;` 或换行分隔条目。
+
+### 52 `CLEONOS_SYSCALL_SPAWN_PATHV`
+
+- 参数：
+- `arg0`: `const char *path`
+- `arg1`: `const char *argv_line`（可为 `0`）
+- `arg2`: `const char *env_line`（可为 `0`）
+- 返回：成功为子进程 PID，失败 `-1`
+
+### 53 `CLEONOS_SYSCALL_PROC_ARGC`
+
+- 参数：无
+- 返回：当前进程 `argc`
+
+### 54 `CLEONOS_SYSCALL_PROC_ARGV`
+
+- 参数：
+- `arg0`: `u64 index`
+- `arg1`: `char *out_value`
+- `arg2`: `u64 out_size`
+- 返回：成功 `1`，失败 `0`
+- 说明：单条参数字符串最大写入 `128` 字节（含终止符）。
+
+### 55 `CLEONOS_SYSCALL_PROC_ENVC`
+
+- 参数：无
+- 返回：当前进程 `envc`
+
+### 56 `CLEONOS_SYSCALL_PROC_ENV`
+
+- 参数：
+- `arg0`: `u64 index`
+- `arg1`: `char *out_value`
+- `arg2`: `u64 out_size`
+- 返回：成功 `1`，失败 `0`
+- 说明：单条环境变量字符串最大写入 `128` 字节（含终止符）。
+
+### 57 `CLEONOS_SYSCALL_PROC_LAST_SIGNAL`
+
+- 参数：无
+- 返回：当前进程最近一次异常映射的信号号（无则 `0`）
+
+### 58 `CLEONOS_SYSCALL_PROC_FAULT_VECTOR`
+
+- 参数：无
+- 返回：当前进程最近一次 CPU 异常向量号（无则 `0`）
+
+### 59 `CLEONOS_SYSCALL_PROC_FAULT_ERROR`
+
+- 参数：无
+- 返回：当前进程最近一次 CPU 异常错误码（无则 `0`）
+
+### 60 `CLEONOS_SYSCALL_PROC_FAULT_RIP`
+
+- 参数：无
+- 返回：当前进程最近一次 CPU 异常 RIP（无则 `0`）
+
 ## 5. 用户态封装函数
 
 用户态封装位于：
@@ -383,14 +458,24 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `cleonos_sys_fs_write()` / `cleonos_sys_fs_append()` / `cleonos_sys_fs_remove()`
 - `cleonos_sys_log_journal_count()` / `cleonos_sys_log_journal_read()`
 - `cleonos_sys_exec_path()`
+- `cleonos_sys_exec_pathv()`
 - `cleonos_sys_tty_write()`
 - `cleonos_sys_kbd_get_char()` / `cleonos_sys_kbd_buffered()`
 - `cleonos_sys_getpid()` / `cleonos_sys_spawn_path()` / `cleonos_sys_wait_pid()`
+- `cleonos_sys_spawn_pathv()`
 - `cleonos_sys_exit()` / `cleonos_sys_sleep_ticks()` / `cleonos_sys_yield()` / `cleonos_sys_shutdown()` / `cleonos_sys_restart()`
 - `cleonos_sys_audio_available()` / `cleonos_sys_audio_play_tone()` / `cleonos_sys_audio_stop()`
+- `cleonos_sys_proc_argc()` / `cleonos_sys_proc_argv()` / `cleonos_sys_proc_envc()` / `cleonos_sys_proc_env()`
+- `cleonos_sys_proc_last_signal()` / `cleonos_sys_proc_fault_vector()` / `cleonos_sys_proc_fault_error()` / `cleonos_sys_proc_fault_rip()`
 
 ## 6. 开发注意事项
 
 - 传入的字符串/缓冲指针目前按“同地址空间可直接访问”模型处理，后续若引入严格用户态地址隔离，需要补充用户内存校验。
 - `FS_READ` 不保证文本终止符；读取文本请预留 1 字节并手动 `buf[n] = '\0'`。
 - `FS_WRITE`/`FS_APPEND` 仅允许 `/temp`，并有单次长度上限。
+
+## 7. Wine 兼容说明
+
+- `wine/cleonos_wine_lib/runner.py` 已适配 syscall `0..60`，包含 `EXEC_PATHV` / `SPAWN_PATHV` 与 `PROC_*` 系列。
+- Wine 在运行时崩溃场景下会生成与内核一致格式的“信号编码退出状态”，可通过 `WAITPID` 读取。
+- Wine 当前音频 syscall 为占位实现：`AUDIO_AVAILABLE=0`，`AUDIO_PLAY_TONE=0`，`AUDIO_STOP=1`。

@@ -27,7 +27,13 @@ static int ush_cmd_wait(const char *arg) {
     }
 
     ush_writeln("wait: exited");
-    ush_print_kv_hex("  STATUS", status);
+    if ((status & (1ULL << 63)) != 0ULL) {
+        ush_print_kv_hex("  SIGNAL", status & 0xFFULL);
+        ush_print_kv_hex("  VECTOR", (status >> 8) & 0xFFULL);
+        ush_print_kv_hex("  ERROR", (status >> 16) & 0xFFFFULL);
+    } else {
+        ush_print_kv_hex("  STATUS", status);
+    }
     return 1;
 }
 

@@ -2,6 +2,7 @@
 static int ush_cmd_help(void) {
     ush_writeln("commands:");
     ush_writeln("  help");
+    ush_writeln("  args [a b c]      (print argc/argv/envp)");
     ush_writeln("  ls [-l] [-R] [path]");
     ush_writeln("  cat [file]        (reads pipeline input when file omitted)");
     ush_writeln("  grep [-n] <pattern> [file]");
@@ -9,7 +10,7 @@ static int ush_cmd_help(void) {
     ush_writeln("  wc [file] / cut -d <char> -f <N> [file] / uniq [file] / sort [file]");
     ush_writeln("  pwd");
     ush_writeln("  cd [dir]");
-    ush_writeln("  exec|run <path|name>");
+    ush_writeln("  exec|run <path|name> [args...]");
     ush_writeln("  clear");
     ush_writeln("  ansi / ansitest / color");
     ush_writeln("  wavplay <file.wav> [steps] [ticks] / wavplay --stop");
@@ -26,7 +27,7 @@ static int ush_cmd_help(void) {
     ush_writeln("  mv <src> <dst>   (/temp only)");
     ush_writeln("  rm <path>        (/temp only)");
     ush_writeln("  pid");
-    ush_writeln("  spawn <path|name>");
+    ush_writeln("  spawn <path|name> [args...]");
     ush_writeln("  wait <pid>");
     ush_writeln("  sleep <ticks>");
     ush_writeln("  yield");

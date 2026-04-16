@@ -65,6 +65,10 @@ u64 cleonos_sys_exec_path(const char *path) {
     return cleonos_syscall(CLEONOS_SYSCALL_EXEC_PATH, (u64)path, 0ULL, 0ULL);
 }
 
+u64 cleonos_sys_exec_pathv(const char *path, const char *argv_line, const char *env_line) {
+    return cleonos_syscall(CLEONOS_SYSCALL_EXEC_PATHV, (u64)path, (u64)argv_line, (u64)env_line);
+}
+
 u64 cleonos_sys_exec_request_count(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_EXEC_REQUESTS, 0ULL, 0ULL, 0ULL);
 }
@@ -177,6 +181,10 @@ u64 cleonos_sys_spawn_path(const char *path) {
     return cleonos_syscall(CLEONOS_SYSCALL_SPAWN_PATH, (u64)path, 0ULL, 0ULL);
 }
 
+u64 cleonos_sys_spawn_pathv(const char *path, const char *argv_line, const char *env_line) {
+    return cleonos_syscall(CLEONOS_SYSCALL_SPAWN_PATHV, (u64)path, (u64)argv_line, (u64)env_line);
+}
+
 u64 cleonos_sys_wait_pid(u64 pid, u64 *out_status) {
     return cleonos_syscall(CLEONOS_SYSCALL_WAITPID, pid, (u64)out_status, 0ULL);
 }
@@ -211,4 +219,36 @@ u64 cleonos_sys_audio_play_tone(u64 hz, u64 ticks) {
 
 u64 cleonos_sys_audio_stop(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_AUDIO_STOP, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_proc_argc(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_ARGC, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_proc_argv(u64 index, char *out_value, u64 out_size) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_ARGV, index, (u64)out_value, out_size);
+}
+
+u64 cleonos_sys_proc_envc(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_ENVC, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_proc_env(u64 index, char *out_value, u64 out_size) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_ENV, index, (u64)out_value, out_size);
+}
+
+u64 cleonos_sys_proc_last_signal(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_LAST_SIGNAL, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_proc_fault_vector(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_FAULT_VECTOR, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_proc_fault_error(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_FAULT_ERROR, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_proc_fault_rip(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_FAULT_RIP, 0ULL, 0ULL, 0ULL);
 }

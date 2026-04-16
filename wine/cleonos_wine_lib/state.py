@@ -4,7 +4,7 @@ import collections
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Deque, Dict, Optional, Tuple
+from typing import Deque, Dict, List, Optional, Tuple
 
 from .constants import u64
 
@@ -44,6 +44,12 @@ class SharedKernelState:
     proc_current_pid: int = 0
     proc_parents: Dict[int, int] = field(default_factory=dict)
     proc_status: Dict[int, Optional[int]] = field(default_factory=dict)
+    proc_argv: Dict[int, List[str]] = field(default_factory=dict)
+    proc_env: Dict[int, List[str]] = field(default_factory=dict)
+    proc_last_signal: Dict[int, int] = field(default_factory=dict)
+    proc_fault_vector: Dict[int, int] = field(default_factory=dict)
+    proc_fault_error: Dict[int, int] = field(default_factory=dict)
+    proc_fault_rip: Dict[int, int] = field(default_factory=dict)
 
     def timer_ticks(self) -> int:
         return (time.monotonic_ns() - self.start_ns) // 1_000_000
@@ -101,6 +107,12 @@ class SharedKernelState:
 
             self.proc_parents[pid] = int(ppid)
             self.proc_status[pid] = None
+            self.proc_argv[pid] = []
+            self.proc_env[pid] = []
+            self.proc_last_signal[pid] = 0
+            self.proc_fault_vector[pid] = 0
+            self.proc_fault_error[pid] = 0
+            self.proc_fault_rip[pid] = 0
             return pid
 
     def set_current_pid(self, pid: int) -> None:
@@ -129,3 +141,63 @@ class SharedKernelState:
                 return 0, 0
 
             return 1, int(status)
+
+    def set_proc_cmdline(self, pid: int, argv: List[str], env: List[str]) -> None:
+        if pid <= 0:
+            return
+
+        with self.proc_lock:
+            if pid not in self.proc_status:
+                return
+            self.proc_argv[pid] = [str(item) for item in argv]
+            self.proc_env[pid] = [str(item) for item in env]
+
+    def set_proc_fault(self, pid: int, signal: int, vector: int, error_code: int, rip: int) -> None:
+        if pid <= 0:
+            return
+
+        with self.proc_lock:
+            if pid not in self.proc_status:
+                return
+            self.proc_last_signal[pid] = int(u64(signal))
+            self.proc_fault_vector[pid] = int(u64(vector))
+            self.proc_fault_error[pid] = int(u64(error_code))
+            self.proc_fault_rip[pid] = int(u64(rip))
+
+    def proc_argc(self, pid: int) -> int:
+        with self.proc_lock:
+            return len(self.proc_argv.get(int(pid), []))
+
+    def proc_argv_item(self, pid: int, index: int) -> Optional[str]:
+        with self.proc_lock:
+            values = self.proc_argv.get(int(pid), [])
+            if index < 0 or index >= len(values):
+                return None
+            return values[index]
+
+    def proc_envc(self, pid: int) -> int:
+        with self.proc_lock:
+            return len(self.proc_env.get(int(pid), []))
+
+    def proc_env_item(self, pid: int, index: int) -> Optional[str]:
+        with self.proc_lock:
+            values = self.proc_env.get(int(pid), [])
+            if index < 0 or index >= len(values):
+                return None
+            return values[index]
+
+    def proc_signal(self, pid: int) -> int:
+        with self.proc_lock:
+            return int(self.proc_last_signal.get(int(pid), 0))
+
+    def proc_fault_vector_value(self, pid: int) -> int:
+        with self.proc_lock:
+            return int(self.proc_fault_vector.get(int(pid), 0))
+
+    def proc_fault_error_value(self, pid: int) -> int:
+        with self.proc_lock:
+            return int(self.proc_fault_error.get(int(pid), 0))
+
+    def proc_fault_rip_value(self, pid: int) -> int:
+        with self.proc_lock:
+            return int(self.proc_fault_rip.get(int(pid), 0))

@@ -1,9 +1,28 @@
 #include "cmd_runtime.h"
 static int ush_cmd_spawn(const ush_state *sh, const char *arg) {
+    char target[USH_PATH_MAX];
+    char argv_line[USH_ARG_MAX];
+    char env_line[USH_PATH_MAX + 32ULL];
+    const char *rest = "";
     char path[USH_PATH_MAX];
     u64 pid;
 
-    if (ush_resolve_exec_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+    if (sh == (const ush_state *)0 || arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("spawn: usage spawn <path|name> [args...]");
+        return 0;
+    }
+
+    if (ush_split_first_and_rest(arg, target, (u64)sizeof(target), &rest) == 0) {
+        ush_writeln("spawn: usage spawn <path|name> [args...]");
+        return 0;
+    }
+
+    argv_line[0] = '\0';
+    if (rest != (const char *)0 && rest[0] != '\0') {
+        ush_copy(argv_line, (u64)sizeof(argv_line), rest);
+    }
+
+    if (ush_resolve_exec_path(sh, target, path, (u64)sizeof(path)) == 0) {
         ush_writeln("spawn: invalid target");
         return 0;
     }
@@ -13,7 +32,11 @@ static int ush_cmd_spawn(const ush_state *sh, const char *arg) {
         return 0;
     }
 
-    pid = cleonos_sys_spawn_path(path);
+    env_line[0] = '\0';
+    ush_copy(env_line, (u64)sizeof(env_line), "PWD=");
+    ush_copy(env_line + 4, (u64)(sizeof(env_line) - 4ULL), sh->cwd);
+
+    pid = cleonos_sys_spawn_pathv(path, argv_line, env_line);
 
     if (pid == (u64)-1) {
         ush_writeln("spawn: request failed");

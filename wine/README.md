@@ -37,15 +37,31 @@ python wine/cleonos_wine.py build/x86_64/ramdisk_root/shell/shell.elf --rootfs b
 ## 支持
 
 - ELF64 (x86_64) PT_LOAD 段装载
-- CLeonOS `int 0x80` syscall 0..45
+- CLeonOS `int 0x80` syscall 0..60
 - TTY 输出与键盘输入队列
 - rootfs 文件/目录访问（`FS_*`）
 - `/temp` 写入限制（`FS_MKDIR/WRITE/APPEND/REMOVE`）
-- `EXEC_PATH` 递归执行 ELF（带深度限制）
-- 进程生命周期 syscall（`GETPID/SPAWN_PATH/WAITPID/EXIT/SLEEP_TICKS/YIELD`）
+- `EXEC_PATH/EXEC_PATHV` 执行 ELF（带深度限制）
+- `SPAWN_PATH/SPAWN_PATHV/WAITPID/EXIT/SLEEP_TICKS/YIELD`
+- 进程 `argv/env` 查询（`PROC_ARGC/PROC_ARGV/PROC_ENVC/PROC_ENV`）
+- 异常退出状态编码与故障元信息（`PROC_LAST_SIGNAL/PROC_FAULT_*`）
 
 ## 参数
 
 - `--no-kbd`：关闭输入线程
 - `--max-exec-depth N`：设置 exec 嵌套深度上限
-- `--verbose`：打印更多日志`n
+- `--verbose`：打印更多日志
+
+## `execv/spawnv` 参数格式
+
+- `argv_line`：按空白字符分词（与内核当前实现一致，不支持引号转义）。
+- `env_line`：按 `;` 或换行切分环境变量项，会去掉每项末尾空白。
+- 子进程 `argv[0]` 固定为目标程序路径（如 `/shell/ls.elf`）。
+
+## 退出状态说明
+
+- 正常退出：返回普通退出码。
+- 异常退出：最高位为 `1`，并编码：
+- bits `7:0` = signal
+- bits `15:8` = CPU exception vector
+- bits `31:16` = error code 低 16 位

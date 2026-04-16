@@ -8,16 +8,20 @@
 ## Implementation
 - Added more user-facing commands in user shell around process/runtime control (`spawn`, `wait`, `sleep`, `yield`, `pid`, file ops under `/temp`).
 - Extended syscall surface (process and runtime related IDs) and kept kernel/user syscall ID tables aligned.
+- Added process argument/environment ABI (`EXEC_PATHV` / `SPAWN_PATHV` + `PROC_ARG*` / `PROC_ENV*`).
+- Added user exception/fault reporting ABI (`PROC_LAST_SIGNAL` / `PROC_FAULT_*`) and signal-encoded exit status.
 - Updated user runtime syscall wrappers to cover newly added syscall IDs.
 - Refactored Wine codebase from single-file implementation into modular structure for CLI, ELF loader, syscall bridge, and runtime helpers.
 
 ## Acceptance Criteria
 - User shell can complete process and temp-file workflows without falling back to kernel shell.
+- User ELF can read `argc/argv/envp` through runtime startup path.
+- `wait` can observe signal-encoded status for crashed user processes.
 - New syscall IDs are available consistently in:
   - `clks/include/clks/syscall.h`
   - `cleonos/c/include/cleonos_syscall.h`
   - `cleonos/c/src/syscall.c`
-- Wine entry remains runnable after split (`python cleonos_wine.py ...`).
+- Wine entry remains runnable after split (`python cleonos_wine.py ...`) and supports process/argv/env/fault syscalls.
 
 ## Build Targets
 - `make userapps`

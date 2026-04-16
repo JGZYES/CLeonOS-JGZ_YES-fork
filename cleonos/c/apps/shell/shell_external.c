@@ -13,6 +13,25 @@ static void ush_zero(void *ptr, u64 size) {
     }
 }
 
+static void ush_append_text(char *dst, u64 dst_size, const char *text) {
+    u64 p = 0ULL;
+    u64 i = 0ULL;
+
+    if (dst == (char *)0 || dst_size == 0ULL || text == (const char *)0) {
+        return;
+    }
+
+    while (dst[p] != '\0' && p + 1ULL < dst_size) {
+        p++;
+    }
+
+    while (text[i] != '\0' && p + 1ULL < dst_size) {
+        dst[p++] = text[i++];
+    }
+
+    dst[p] = '\0';
+}
+
 static const char *ush_alias_command(const char *cmd) {
     if (cmd == (const char *)0) {
         return (const char *)0;
@@ -121,6 +140,7 @@ int ush_command_ret_read(ush_cmd_ret *out_ret) {
 int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *out_success) {
     const char *canonical;
     char path[USH_PATH_MAX];
+    char env_line[USH_PATH_MAX + USH_CMD_MAX + 32ULL];
     u64 status;
     ush_cmd_ret ret;
 
@@ -153,7 +173,13 @@ int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *
         return 1;
     }
 
-    status = cleonos_sys_exec_path(path);
+    env_line[0] = '\0';
+    ush_append_text(env_line, (u64)sizeof(env_line), "PWD=");
+    ush_append_text(env_line, (u64)sizeof(env_line), sh->cwd);
+    ush_append_text(env_line, (u64)sizeof(env_line), ";CMD=");
+    ush_append_text(env_line, (u64)sizeof(env_line), canonical);
+
+    status = cleonos_sys_exec_pathv(path, arg, env_line);
 
     if (status == (u64)-1) {
         ush_writeln("exec: request failed");
@@ -169,7 +195,15 @@ int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *
     (void)cleonos_sys_fs_remove(USH_CMD_RET_PATH);
 
     if (status != 0ULL) {
-        ush_writeln("exec: returned non-zero status");
+        if ((status & (1ULL << 63)) != 0ULL) {
+            ush_writeln("exec: terminated by signal");
+            ush_print_kv_hex("  SIGNAL", status & 0xFFULL);
+            ush_print_kv_hex("  VECTOR", (status >> 8) & 0xFFULL);
+            ush_print_kv_hex("  ERROR", (status >> 16) & 0xFFFFULL);
+        } else {
+            ush_writeln("exec: returned non-zero status");
+            ush_print_kv_hex("  STATUS", status);
+        }
 
         if (out_success != (int *)0) {
             *out_success = 0;

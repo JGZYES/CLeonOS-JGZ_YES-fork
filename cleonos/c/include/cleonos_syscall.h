@@ -57,6 +57,16 @@ typedef unsigned long long usize;
 #define CLEONOS_SYSCALL_AUDIO_AVAILABLE     48ULL
 #define CLEONOS_SYSCALL_AUDIO_PLAY_TONE     49ULL
 #define CLEONOS_SYSCALL_AUDIO_STOP          50ULL
+#define CLEONOS_SYSCALL_EXEC_PATHV          51ULL
+#define CLEONOS_SYSCALL_SPAWN_PATHV         52ULL
+#define CLEONOS_SYSCALL_PROC_ARGC           53ULL
+#define CLEONOS_SYSCALL_PROC_ARGV           54ULL
+#define CLEONOS_SYSCALL_PROC_ENVC           55ULL
+#define CLEONOS_SYSCALL_PROC_ENV            56ULL
+#define CLEONOS_SYSCALL_PROC_LAST_SIGNAL    57ULL
+#define CLEONOS_SYSCALL_PROC_FAULT_VECTOR   58ULL
+#define CLEONOS_SYSCALL_PROC_FAULT_ERROR    59ULL
+#define CLEONOS_SYSCALL_PROC_FAULT_RIP      60ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -72,6 +82,7 @@ u64 cleonos_sys_fs_child_count(const char *dir_path);
 u64 cleonos_sys_fs_get_child_name(const char *dir_path, u64 index, char *out_name);
 u64 cleonos_sys_fs_read(const char *path, char *out_buffer, u64 buffer_size);
 u64 cleonos_sys_exec_path(const char *path);
+u64 cleonos_sys_exec_pathv(const char *path, const char *argv_line, const char *env_line);
 u64 cleonos_sys_exec_request_count(void);
 u64 cleonos_sys_exec_success_count(void);
 u64 cleonos_sys_user_shell_ready(void);
@@ -100,6 +111,7 @@ u64 cleonos_sys_kbd_dropped(void);
 u64 cleonos_sys_kbd_hotkey_switches(void);
 u64 cleonos_sys_getpid(void);
 u64 cleonos_sys_spawn_path(const char *path);
+u64 cleonos_sys_spawn_pathv(const char *path, const char *argv_line, const char *env_line);
 u64 cleonos_sys_wait_pid(u64 pid, u64 *out_status);
 u64 cleonos_sys_exit(u64 status);
 u64 cleonos_sys_sleep_ticks(u64 ticks);
@@ -109,5 +121,13 @@ u64 cleonos_sys_restart(void);
 u64 cleonos_sys_audio_available(void);
 u64 cleonos_sys_audio_play_tone(u64 hz, u64 ticks);
 u64 cleonos_sys_audio_stop(void);
+u64 cleonos_sys_proc_argc(void);
+u64 cleonos_sys_proc_argv(u64 index, char *out_value, u64 out_size);
+u64 cleonos_sys_proc_envc(void);
+u64 cleonos_sys_proc_env(u64 index, char *out_value, u64 out_size);
+u64 cleonos_sys_proc_last_signal(void);
+u64 cleonos_sys_proc_fault_vector(void);
+u64 cleonos_sys_proc_fault_error(void);
+u64 cleonos_sys_proc_fault_rip(void);
 
 #endif
