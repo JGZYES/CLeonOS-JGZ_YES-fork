@@ -594,13 +594,16 @@ add_custom_command(
 add_custom_command(
     OUTPUT "${ISO_IMAGE}"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${ISO_ROOT}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${ISO_ROOT}/boot/limine"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ISO_ROOT}/boot/limine" "${ISO_ROOT}/EFI/BOOT"
     COMMAND ${CMAKE_COMMAND} -E copy "${KERNEL_ELF}" "${ISO_ROOT}/boot/clks_kernel.elf"
     COMMAND ${CMAKE_COMMAND} -E copy "${RAMDISK_IMAGE}" "${ISO_ROOT}/boot/cleonos_ramdisk.tar"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/configs/limine.conf" "${ISO_ROOT}/boot/limine/limine.conf"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/configs/limine.conf" "${ISO_ROOT}/EFI/BOOT/limine.conf"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/configs/limine.conf" "${ISO_ROOT}/limine.conf"
     COMMAND ${CMAKE_COMMAND} -E copy "${LIMINE_BIN_DIR_ABS}/limine-bios.sys" "${ISO_ROOT}/boot/limine/limine-bios.sys"
     COMMAND ${CMAKE_COMMAND} -E copy "${LIMINE_BIN_DIR_ABS}/limine-bios-cd.bin" "${ISO_ROOT}/boot/limine/limine-bios-cd.bin"
     COMMAND ${CMAKE_COMMAND} -E copy "${LIMINE_BIN_DIR_ABS}/limine-uefi-cd.bin" "${ISO_ROOT}/boot/limine/limine-uefi-cd.bin"
+    COMMAND ${CMAKE_COMMAND} -E copy "${LIMINE_BIN_DIR_ABS}/BOOTX64.EFI" "${ISO_ROOT}/EFI/BOOT/BOOTX64.EFI"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build"
     COMMAND ${CMAKE_COMMAND}
         "-DNO_COLOR=${NO_COLOR}"

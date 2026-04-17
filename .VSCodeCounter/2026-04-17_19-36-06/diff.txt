@@ -1,0 +1,71 @@
+Date : 2026-04-17 19:36:06
+Directory : d:\Projects\C\cleonos
+Total : 27 files,  2979 codes, 1 comments, 752 blanks, all 3732 lines
+
+Languages
++-------------+------------+------------+------------+------------+------------+
+| language    | files      | code       | comment    | blank      | total      |
++-------------+------------+------------+------------+------------+------------+
+| C           |         17 |      2,716 |          1 |        700 |      3,417 |
+| CMake       |          4 |        109 |          0 |         30 |        139 |
+| C++         |          4 |         84 |          0 |          8 |         92 |
+| Markdown    |          1 |         52 |          0 |         14 |         66 |
+| Go Assembly |          1 |         18 |          0 |          0 |         18 |
++-------------+------------+------------+------------+------------+------------+
+
+Directories
++-----------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                      | files      | code       | comment    | blank      | total      |
++-----------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                         |         27 |      2,979 |          1 |        752 |      3,732 |
+| . (Files)                                                 |          1 |         27 |          0 |          2 |         29 |
+| cleonos                                                   |         12 |      1,176 |          0 |        282 |      1,458 |
+| cleonos\c                                                 |         12 |      1,176 |          0 |        282 |      1,458 |
+| cleonos\c\apps                                            |         10 |      1,104 |          0 |        269 |      1,373 |
+| cleonos\c\apps (Files)                                    |          9 |      1,101 |          0 |        269 |      1,370 |
+| cleonos\c\apps\shell                                      |          1 |          3 |          0 |          0 |          3 |
+| cleonos\c\include                                         |          1 |         40 |          0 |          3 |         43 |
+| cleonos\c\src                                             |          1 |         32 |          0 |         10 |         42 |
+| clks                                                      |         10 |      1,642 |          1 |        426 |      2,069 |
+| clks\arch                                                 |          1 |         18 |          0 |          0 |         18 |
+| clks\arch\x86_64                                          |          1 |         18 |          0 |          0 |         18 |
+| clks\include                                              |          3 |         44 |          0 |          5 |         49 |
+| clks\include\clks                                         |          3 |         44 |          0 |          5 |         49 |
+| clks\kernel                                               |          6 |      1,580 |          1 |        421 |      2,002 |
+| cmake                                                     |          3 |         82 |          0 |         28 |        110 |
+| docs                                                      |          1 |         52 |          0 |         14 |         66 |
++-----------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-----------------------------------------------------------+-------------+------------+------------+------------+------------+
+| filename                                                  | language    | code       | comment    | blank      | total      |
++-----------------------------------------------------------+-------------+------------+------------+------------+------------+
+| d:\Projects\C\cleonos\CMakeLists.txt                      | CMake       |         27 |          0 |          2 |         29 |
+| d:\Projects\C\cleonos\cleonos\c\apps\bg_main.c            | C           |        101 |          0 |         26 |        127 |
+| d:\Projects\C\cleonos\cleonos\c\apps\fg_main.c            | C           |        150 |          0 |         36 |        186 |
+| d:\Projects\C\cleonos\cleonos\c\apps\help_main.c          | C           |          4 |          0 |          0 |          4 |
+| d:\Projects\C\cleonos\cleonos\c\apps\jobs_main.c          | C           |        120 |          0 |         26 |        146 |
+| d:\Projects\C\cleonos\cleonos\c\apps\kdbg_main.c          | C           |        214 |          0 |         56 |        270 |
+| d:\Projects\C\cleonos\cleonos\c\apps\kill_main.c          | C           |        144 |          0 |         39 |        183 |
+| d:\Projects\C\cleonos\cleonos\c\apps\ps_main.c            | C           |        160 |          0 |         35 |        195 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shell\shell_cmd.c    | C           |          3 |          0 |          0 |          3 |
+| d:\Projects\C\cleonos\cleonos\c\apps\spin_main.c          | C           |         13 |          0 |          4 |         17 |
+| d:\Projects\C\cleonos\cleonos\c\apps\top_main.c           | C           |        195 |          0 |         47 |        242 |
+| d:\Projects\C\cleonos\cleonos\c\include\cleonos_syscall.h | C++         |         40 |          0 |          3 |         43 |
+| d:\Projects\C\cleonos\cleonos\c\src\syscall.c             | C           |         32 |          0 |         10 |         42 |
+| d:\Projects\C\cleonos\clks\arch\x86_64\exec_stack_call.S  | Go Assembly |         18 |          0 |          0 |         18 |
+| d:\Projects\C\cleonos\clks\include\clks\exec.h            | C++         |         32 |          0 |          4 |         36 |
+| d:\Projects\C\cleonos\clks\include\clks\panic.h           | C++         |          5 |          0 |          1 |          6 |
+| d:\Projects\C\cleonos\clks\include\clks\syscall.h         | C++         |          7 |          0 |          0 |          7 |
+| d:\Projects\C\cleonos\clks\kernel\exec.c                  | C           |        349 |          1 |         98 |        448 |
+| d:\Projects\C\cleonos\clks\kernel\interrupts.c            | C           |          6 |          0 |          0 |          6 |
+| d:\Projects\C\cleonos\clks\kernel\keyboard.c              | C           |         40 |          0 |          9 |         49 |
+| d:\Projects\C\cleonos\clks\kernel\log.c                   | C           |         62 |          0 |         15 |         77 |
+| d:\Projects\C\cleonos\clks\kernel\panic.c                 | C           |        367 |          0 |         95 |        462 |
+| d:\Projects\C\cleonos\clks\kernel\syscall.c               | C           |        756 |          0 |        204 |        960 |
+| d:\Projects\C\cleonos\cmake\check_tools.cmake             | CMake       |          2 |          0 |          1 |          3 |
+| d:\Projects\C\cleonos\cmake\gen_kernel_symbols.cmake      | CMake       |         80 |          0 |         26 |        106 |
+| d:\Projects\C\cleonos\cmake\setup_limine.cmake            | CMake       |          0 |          0 |          1 |          1 |
+| d:\Projects\C\cleonos\docs\syscall.md                     | Markdown    |         52 |          0 |         14 |         66 |
+| Total                                                     |             |      2,979 |          1 |        752 |      3,732 |
++-----------------------------------------------------------+-------------+------------+------------+------------+------------+
