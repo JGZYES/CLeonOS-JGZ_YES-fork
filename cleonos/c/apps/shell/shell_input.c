@@ -7,6 +7,8 @@ static u64 ush_input_sel_end = 0ULL;
 static int ush_input_sel_active = 0;
 static u64 ush_input_sel_anchor = 0ULL;
 static int ush_input_sel_anchor_valid = 0;
+#define USH_RENDER_BUF_MAX 4096ULL
+#define USH_RENDER_EMIT_CHUNK 2000ULL
 
 static void ush_input_selection_clear(void) {
     ush_input_sel_active = 0;
@@ -240,7 +242,46 @@ static void ush_load_line(ush_state *sh, const char *line) {
     ush_input_selection_clear();
 }
 
-static void ush_render_line_segment(const ush_state *sh, u64 limit) {
+static void ush_render_buf_append_char(char *out, u64 out_size, u64 *io_len, char ch) {
+    if (out == (char *)0 || io_len == (u64 *)0 || out_size == 0ULL) {
+        return;
+    }
+
+    if (*io_len + 1ULL >= out_size) {
+        return;
+    }
+
+    out[*io_len] = ch;
+    *io_len += 1ULL;
+}
+
+static void ush_render_buf_append_text(char *out, u64 out_size, u64 *io_len, const char *text) {
+    u64 i = 0ULL;
+
+    if (text == (const char *)0) {
+        return;
+    }
+
+    while (text[i] != '\0') {
+        ush_render_buf_append_char(out, out_size, io_len, text[i]);
+        i++;
+    }
+}
+
+static void ush_render_buf_append_prompt(const ush_state *sh, char *out, u64 out_size, u64 *io_len) {
+    ush_render_buf_append_text(out, out_size, io_len, "\x1B[96mcleonos\x1B[0m(\x1B[92muser\x1B[0m");
+
+    if (sh == (const ush_state *)0) {
+        ush_render_buf_append_text(out, out_size, io_len, ")> ");
+        return;
+    }
+
+    ush_render_buf_append_text(out, out_size, io_len, ":\x1B[93m");
+    ush_render_buf_append_text(out, out_size, io_len, sh->cwd);
+    ush_render_buf_append_text(out, out_size, io_len, "\x1B[0m)> ");
+}
+
+static void ush_render_buf_append_line_segment(const ush_state *sh, u64 limit, char *out, u64 out_size, u64 *io_len) {
     u64 i;
     u64 sel_start = 0ULL;
     u64 sel_end = 0ULL;
@@ -259,41 +300,64 @@ static void ush_render_line_segment(const ush_state *sh, u64 limit) {
 
     for (i = 0ULL; i < limit; i++) {
         if (has_sel != 0 && inverse_on == 0 && i == sel_start) {
-            ush_write("\x1B[7m");
+            ush_render_buf_append_text(out, out_size, io_len, "\x1B[7m");
             inverse_on = 1;
         }
 
         if (has_sel != 0 && inverse_on != 0 && i == sel_end) {
-            ush_write("\x1B[27m");
+            ush_render_buf_append_text(out, out_size, io_len, "\x1B[27m");
             inverse_on = 0;
         }
 
-        ush_write_char(sh->line[i]);
+        ush_render_buf_append_char(out, out_size, io_len, sh->line[i]);
     }
 
     if (inverse_on != 0) {
-        ush_write("\x1B[27m");
+        ush_render_buf_append_text(out, out_size, io_len, "\x1B[27m");
+    }
+}
+
+static void ush_render_emit(const char *buffer, u64 length) {
+    u64 offset = 0ULL;
+
+    if (buffer == (const char *)0 || length == 0ULL) {
+        return;
+    }
+
+    while (offset < length) {
+        u64 chunk = length - offset;
+
+        if (chunk > USH_RENDER_EMIT_CHUNK) {
+            chunk = USH_RENDER_EMIT_CHUNK;
+        }
+
+        (void)cleonos_sys_tty_write(buffer + offset, chunk);
+        offset += chunk;
     }
 }
 
 static void ush_render_line(ush_state *sh) {
+    char render[USH_RENDER_BUF_MAX];
+    u64 out_len = 0ULL;
     u64 i;
 
     if (sh == (ush_state *)0) {
         return;
     }
 
-    ush_write_char('\r');
-    ush_prompt(sh);
-    ush_render_line_segment(sh, sh->line_len);
+    ush_render_buf_append_char(render, (u64)sizeof(render), &out_len, '\r');
+    ush_render_buf_append_prompt(sh, render, (u64)sizeof(render), &out_len);
+    ush_render_buf_append_line_segment(sh, sh->line_len, render, (u64)sizeof(render), &out_len);
 
     for (i = sh->line_len; i < sh->rendered_len; i++) {
-        ush_write_char(' ');
+        ush_render_buf_append_char(render, (u64)sizeof(render), &out_len, ' ');
     }
 
-    ush_write_char('\r');
-    ush_prompt(sh);
-    ush_render_line_segment(sh, sh->cursor);
+    ush_render_buf_append_char(render, (u64)sizeof(render), &out_len, '\r');
+    ush_render_buf_append_prompt(sh, render, (u64)sizeof(render), &out_len);
+    ush_render_buf_append_line_segment(sh, sh->cursor, render, (u64)sizeof(render), &out_len);
+
+    ush_render_emit(render, out_len);
 
     sh->rendered_len = sh->line_len;
 }
