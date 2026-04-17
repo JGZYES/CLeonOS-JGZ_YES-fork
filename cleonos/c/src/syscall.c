@@ -310,3 +310,23 @@ u64 cleonos_sys_stats_recent_window(void) {
 u64 cleonos_sys_stats_recent_id(u64 id) {
     return cleonos_syscall(CLEONOS_SYSCALL_STATS_RECENT_ID, id, 0ULL, 0ULL);
 }
+
+u64 cleonos_sys_fd_open(const char *path, u64 flags, u64 mode) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FD_OPEN, (u64)path, flags, mode);
+}
+
+u64 cleonos_sys_fd_read(u64 fd, void *out_buffer, u64 size) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FD_READ, fd, (u64)out_buffer, size);
+}
+
+u64 cleonos_sys_fd_write(u64 fd, const void *buffer, u64 size) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FD_WRITE, fd, (u64)buffer, size);
+}
+
+u64 cleonos_sys_fd_close(u64 fd) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FD_CLOSE, fd, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_fd_dup(u64 fd) {
+    return cleonos_syscall(CLEONOS_SYSCALL_FD_DUP, fd, 0ULL, 0ULL);
+}

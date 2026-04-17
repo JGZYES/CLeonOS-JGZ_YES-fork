@@ -83,7 +83,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `/proc/<pid>`：指定 PID 快照文本
 - `/proc` 为只读；写入类 syscall 不支持。
 
-## 4. Syscall 列表（0~71）
+## 4. Syscall 列表（0~76）
 
 ### 0 `CLEONOS_SYSCALL_LOG_WRITE`
 
@@ -557,6 +557,53 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `arg0`: `u64 id`
 - 返回：指定 syscall ID 在“最近窗口”中的出现次数（ID 越界返回 `0`）
 
+### 72 `CLEONOS_SYSCALL_FD_OPEN`
+
+- 参数：
+- `arg0`: `const char *path`
+- `arg1`: `u64 flags`
+- `arg2`: `u64 mode`（当前保留）
+- 返回：成功返回 `fd`，失败返回 `-1`
+- 说明：
+- 当前支持普通文件与 `/dev/tty`。
+- 默认进程会预置 `fd 0/1/2`（stdin/stdout/stderr）。
+- 标志位兼容子集：`O_RDONLY/O_WRONLY/O_RDWR/O_CREAT/O_TRUNC/O_APPEND`。
+
+### 73 `CLEONOS_SYSCALL_FD_READ`
+
+- 参数：
+- `arg0`: `u64 fd`
+- `arg1`: `void *out_buffer`
+- `arg2`: `u64 size`
+- 返回：读取字节数；错误返回 `-1`
+- 说明：
+- 对 `tty fd`（如 stdin）为非阻塞读取：无输入时返回 `0`。
+- 对文件 fd 为顺序读取，内部维护偏移。
+
+### 74 `CLEONOS_SYSCALL_FD_WRITE`
+
+- 参数：
+- `arg0`: `u64 fd`
+- `arg1`: `const void *buffer`
+- `arg2`: `u64 size`
+- 返回：写入字节数；错误返回 `-1`
+- 说明：
+- `tty fd` 输出到终端。
+- 文件 fd 支持顺序写；`O_APPEND` 下始终追加。
+
+### 75 `CLEONOS_SYSCALL_FD_CLOSE`
+
+- 参数：
+- `arg0`: `u64 fd`
+- 返回：成功 `0`，失败 `-1`
+
+### 76 `CLEONOS_SYSCALL_FD_DUP`
+
+- 参数：
+- `arg0`: `u64 oldfd`
+- 返回：新 fd；失败 `-1`
+- 说明：当前为“按值复制”语义（复制 flags/offset/目标对象）。
+
 ## 5. 用户态封装函数
 
 用户态封装位于：
@@ -581,6 +628,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `cleonos_sys_proc_count()` / `cleonos_sys_proc_pid_at()` / `cleonos_sys_proc_snapshot()` / `cleonos_sys_proc_kill()`
 - `cleonos_sys_kdbg_sym()` / `cleonos_sys_kdbg_bt()` / `cleonos_sys_kdbg_regs()`
 - `cleonos_sys_stats_total()` / `cleonos_sys_stats_id_count()` / `cleonos_sys_stats_recent_window()` / `cleonos_sys_stats_recent_id()`
+- `cleonos_sys_fd_open()` / `cleonos_sys_fd_read()` / `cleonos_sys_fd_write()` / `cleonos_sys_fd_close()` / `cleonos_sys_fd_dup()`
 
 ## 6. 开发注意事项
 
@@ -591,6 +639,6 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 
 ## 7. Wine 兼容说明
 
-- `wine/cleonos_wine_lib/runner.py` 目前以 syscall `0..67` 为主，新增 ID 需同步适配后才能完整观测统计类接口。
+- `wine/cleonos_wine_lib/runner.py` 目前以 syscall `0..67` 为主；`68..76`（stats/fd）需同步适配后才能完整覆盖。
 - Wine 在运行时崩溃场景下会生成与内核一致格式的“信号编码退出状态”，可通过 `WAITPID` 读取。
 - Wine 当前音频 syscall 为占位实现：`AUDIO_AVAILABLE=0`，`AUDIO_PLAY_TONE=0`，`AUDIO_STOP=1`。

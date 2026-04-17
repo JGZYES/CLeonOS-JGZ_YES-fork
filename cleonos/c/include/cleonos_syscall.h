@@ -18,6 +18,13 @@ typedef unsigned long long usize;
 #define CLEONOS_SIGCONT 18ULL
 #define CLEONOS_SIGSTOP 19ULL
 
+#define CLEONOS_O_RDONLY 0x0000ULL
+#define CLEONOS_O_WRONLY 0x0001ULL
+#define CLEONOS_O_RDWR   0x0002ULL
+#define CLEONOS_O_CREAT  0x0040ULL
+#define CLEONOS_O_TRUNC  0x0200ULL
+#define CLEONOS_O_APPEND 0x0400ULL
+
 typedef struct cleonos_proc_snapshot {
     u64 pid;
     u64 ppid;
@@ -107,6 +114,11 @@ typedef struct cleonos_proc_snapshot {
 #define CLEONOS_SYSCALL_STATS_ID_COUNT      69ULL
 #define CLEONOS_SYSCALL_STATS_RECENT_WINDOW 70ULL
 #define CLEONOS_SYSCALL_STATS_RECENT_ID     71ULL
+#define CLEONOS_SYSCALL_FD_OPEN             72ULL
+#define CLEONOS_SYSCALL_FD_READ             73ULL
+#define CLEONOS_SYSCALL_FD_WRITE            74ULL
+#define CLEONOS_SYSCALL_FD_CLOSE            75ULL
+#define CLEONOS_SYSCALL_FD_DUP              76ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -180,5 +192,10 @@ u64 cleonos_sys_stats_total(void);
 u64 cleonos_sys_stats_id_count(u64 id);
 u64 cleonos_sys_stats_recent_window(void);
 u64 cleonos_sys_stats_recent_id(u64 id);
+u64 cleonos_sys_fd_open(const char *path, u64 flags, u64 mode);
+u64 cleonos_sys_fd_read(u64 fd, void *out_buffer, u64 size);
+u64 cleonos_sys_fd_write(u64 fd, const void *buffer, u64 size);
+u64 cleonos_sys_fd_close(u64 fd);
+u64 cleonos_sys_fd_dup(u64 fd);
 
 #endif
