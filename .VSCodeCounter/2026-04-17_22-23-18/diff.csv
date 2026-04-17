@@ -1,0 +1,15 @@
+"filename", "language", "CMake", "C", "Markdown", "C++", "comment", "blank", "total"
+"d:\Projects\C\cleonos\CMakeLists.txt", "CMake", 1, 0, 0, 0, 0, 0, 1
+"d:\Projects\C\cleonos\cleonos\c\apps\help_main.c", "C", 0, 1, 0, 0, 0, 0, 1
+"d:\Projects\C\cleonos\cleonos\c\apps\procstat_main.c", "C", 0, 202, 0, 0, 0, 43, 245
+"d:\Projects\C\cleonos\cleonos\c\apps\shell\shell_cmd.c", "C", 0, 1, 0, 0, 0, 0, 1
+"d:\Projects\C\cleonos\cleonos\c\apps\shell\shell_input.c", "C", 0, 49, 0, 0, 0, 15, 64
+"d:\Projects\C\cleonos\cleonos\c\apps\sysstat_main.c", "C", 0, 267, 0, 0, 0, 45, 312
+"d:\Projects\C\cleonos\cleonos\c\include\cleonos_syscall.h", "C++", 0, 0, 0, 24, 0, 1, 25
+"d:\Projects\C\cleonos\cleonos\c\src\syscall.c", "C", 0, 27, 0, 0, 0, 9, 36
+"d:\Projects\C\cleonos\clks\include\clks\exec.h", "C++", 0, 0, 0, 5, 0, 0, 5
+"d:\Projects\C\cleonos\clks\include\clks\syscall.h", "C++", 0, 0, 0, 9, 0, 0, 9
+"d:\Projects\C\cleonos\clks\kernel\exec.c", "C", 0, 319, 0, 0, 0, 100, 419
+"d:\Projects\C\cleonos\clks\kernel\syscall.c", "C", 0, 105, 0, 0, 0, 26, 131
+"d:\Projects\C\cleonos\docs\syscall.md", "Markdown", 0, 0, 73, 0, 0, 24, 97
+"Total", "-", 1, 971, 73, 38, 0, 263, 1346
