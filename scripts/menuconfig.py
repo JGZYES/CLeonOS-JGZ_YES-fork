@@ -169,6 +169,108 @@ def init_values(options: Iterable[OptionItem], previous: Dict[str, bool], use_de
     return values
 
 
+def _set_option_if_exists(values: Dict[str, bool], key: str, enabled: bool) -> None:
+    if key in values:
+        values[key] = enabled
+
+
+def _set_all_options(values: Dict[str, bool], options: List[OptionItem], enabled: bool) -> None:
+    for item in options:
+        values[item.key] = enabled
+
+
+def apply_preset(preset: str, clks_options: List[OptionItem], user_options: List[OptionItem], values: Dict[str, bool]) -> None:
+    preset_name = preset.strip().lower()
+
+    if preset_name == "full":
+        _set_all_options(values, clks_options, True)
+        _set_all_options(values, user_options, True)
+        return
+
+    if preset_name == "dev":
+        _set_all_options(values, clks_options, True)
+        _set_all_options(values, user_options, True)
+        _set_option_if_exists(values, "CLEONOS_CLKS_ENABLE_USERLAND_AUTO_EXEC", False)
+        _set_option_if_exists(values, "CLEONOS_CLKS_ENABLE_EXEC_SERIAL_LOG", True)
+        _set_option_if_exists(values, "CLEONOS_CLKS_ENABLE_PROCFS", True)
+        _set_option_if_exists(values, "CLEONOS_CLKS_ENABLE_IDLE_DEBUG_LOG", True)
+        return
+
+    if preset_name == "minimal":
+        _set_all_options(values, clks_options, True)
+        _set_all_options(values, user_options, False)
+
+        clks_disable = [
+            "CLEONOS_CLKS_ENABLE_AUDIO",
+            "CLEONOS_CLKS_ENABLE_MOUSE",
+            "CLEONOS_CLKS_ENABLE_DESKTOP",
+            "CLEONOS_CLKS_ENABLE_DRIVER_MANAGER",
+            "CLEONOS_CLKS_ENABLE_KELF",
+            "CLEONOS_CLKS_ENABLE_EXTERNAL_PSF",
+            "CLEONOS_CLKS_ENABLE_ELFRUNNER_PROBE",
+            "CLEONOS_CLKS_ENABLE_KLOGD_TASK",
+            "CLEONOS_CLKS_ENABLE_KWORKER_TASK",
+            "CLEONOS_CLKS_ENABLE_BOOT_VIDEO_LOG",
+            "CLEONOS_CLKS_ENABLE_PMM_STATS_LOG",
+            "CLEONOS_CLKS_ENABLE_HEAP_STATS_LOG",
+            "CLEONOS_CLKS_ENABLE_FS_ROOT_LOG",
+            "CLEONOS_CLKS_ENABLE_ELFRUNNER_INIT",
+            "CLEONOS_CLKS_ENABLE_SYSCALL_TICK_QUERY",
+            "CLEONOS_CLKS_ENABLE_TTY_READY_LOG",
+            "CLEONOS_CLKS_ENABLE_IDLE_DEBUG_LOG",
+            "CLEONOS_CLKS_ENABLE_USER_SYSTEM_APP_PROBE",
+            "CLEONOS_CLKS_ENABLE_SCHED_TASK_COUNT_LOG",
+        ]
+        for key in clks_disable:
+            _set_option_if_exists(values, key, False)
+
+        clks_enable = [
+            "CLEONOS_CLKS_ENABLE_KEYBOARD",
+            "CLEONOS_CLKS_ENABLE_USRD_TASK",
+            "CLEONOS_CLKS_ENABLE_USERLAND_AUTO_EXEC",
+            "CLEONOS_CLKS_ENABLE_HEAP_SELFTEST",
+            "CLEONOS_CLKS_ENABLE_SYSTEM_DIR_CHECK",
+            "CLEONOS_CLKS_ENABLE_PROCFS",
+            "CLEONOS_CLKS_ENABLE_EXEC_SERIAL_LOG",
+            "CLEONOS_CLKS_ENABLE_KBD_TTY_SWITCH_HOTKEY",
+            "CLEONOS_CLKS_ENABLE_KBD_CTRL_SHORTCUTS",
+            "CLEONOS_CLKS_ENABLE_KBD_FORCE_STOP_HOTKEY",
+            "CLEONOS_CLKS_ENABLE_USER_INIT_SCRIPT_PROBE",
+            "CLEONOS_CLKS_ENABLE_INTERRUPT_READY_LOG",
+            "CLEONOS_CLKS_ENABLE_SHELL_MODE_LOG",
+        ]
+        for key in clks_enable:
+            _set_option_if_exists(values, key, True)
+
+        user_enable_tokens = [
+            "SHELL",
+            "HELP",
+            "LS",
+            "CD",
+            "PWD",
+            "CAT",
+            "CLEAR",
+            "EXIT",
+            "EXEC",
+            "DMESG",
+            "TTY",
+            "PID",
+            "PS",
+            "KILL",
+            "JOBS",
+            "FG",
+            "BG",
+            "RESTART",
+            "SHUTDOWN",
+            "TTYDRV",
+        ]
+        for token in user_enable_tokens:
+            _set_option_if_exists(values, f"CLEONOS_USER_APP_{token}", True)
+        return
+
+    raise RuntimeError(f"unknown preset: {preset}")
+
+
 def print_section(title: str, options: List[OptionItem], values: Dict[str, bool]) -> None:
     print()
     print(f"== {title} ==")
@@ -1049,6 +1151,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--plain", action="store_true", help="use legacy plain-text menu instead of ncurses")
     parser.add_argument("--gui", action="store_true", help="use GUI window mode (PySide)")
     parser.add_argument(
+        "--preset",
+        choices=["full", "minimal", "dev"],
+        help="apply a built-in preset before interactive edit or save",
+    )
+    parser.add_argument(
         "--set",
         action="append",
         default=[],
@@ -1070,6 +1177,10 @@ def main() -> int:
 
     previous = load_previous_values()
     values = init_values(all_options, previous, use_defaults=args.defaults)
+
+    if args.preset:
+        apply_preset(args.preset, clks_options, user_options, values)
+
     parse_set_overrides(values, args.set)
 
     should_save = args.non_interactive

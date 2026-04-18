@@ -5,6 +5,15 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      menuconfig_preset:
+        description: "menuconfig preset (full/minimal/dev)"
+        type: choice
+        options:
+          - full
+          - minimal
+          - dev
+        required: false
+        default: "full"
       menuconfig_overrides:
         description: "Optional extra menuconfig args, e.g. --set CLEONOS_CLKS_ENABLE_AUDIO=OFF"
         required: false
@@ -17,6 +26,7 @@ jobs:
   build-os:
     runs-on: ubuntu-latest
     env:
+      MENUCONFIG_PRESET: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.menuconfig_preset || 'full' }}
       MENUCONFIG_OVERRIDES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.menuconfig_overrides || '' }}
 
     steps:
@@ -47,7 +57,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Generate menuconfig (default all enabled)
+      - name: Generate menuconfig (shared preset)
         shell: bash
         run: |
           set -euo pipefail
@@ -56,8 +66,8 @@ jobs:
             # shellcheck disable=SC2206
             extra_args=(${MENUCONFIG_OVERRIDES})
           fi
-          python3 scripts/menuconfig.py --defaults --non-interactive "${extra_args[@]}"
-          echo "menuconfig generated with defaults=all-enabled"
+          python3 scripts/menuconfig.py --defaults --non-interactive --preset "${MENUCONFIG_PRESET}" "${extra_args[@]}"
+          echo "menuconfig generated with preset=${MENUCONFIG_PRESET}"
 
       - name: Configure
         run: |

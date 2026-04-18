@@ -17,6 +17,7 @@ OBJDUMP_FOR_TARGET ?=
 READELF_FOR_TARGET ?=
 PYTHON ?= python3
 MENUCONFIG_ARGS ?=
+MENUCONFIG_PRESET ?=
 
 ifeq ($(strip $(CMAKE_GENERATOR)),)
 GEN_ARG :=
@@ -25,6 +26,7 @@ GEN_ARG := -G "$(CMAKE_GENERATOR)"
 endif
 
 CMAKE_PASSTHROUGH_ARGS :=
+MENUCONFIG_PRESET_ARG := $(if $(strip $(MENUCONFIG_PRESET)),--preset $(MENUCONFIG_PRESET),)
 
 ifneq ($(strip $(LIMINE_SKIP_CONFIGURE)),)
 CMAKE_PASSTHROUGH_ARGS += -DLIMINE_SKIP_CONFIGURE=$(LIMINE_SKIP_CONFIGURE)
@@ -64,9 +66,9 @@ reconfigure:
 
 menuconfig:
 > @if command -v $(PYTHON) >/dev/null 2>&1; then \
->     $(PYTHON) scripts/menuconfig.py $(MENUCONFIG_ARGS); \
+>     $(PYTHON) scripts/menuconfig.py $(MENUCONFIG_PRESET_ARG) $(MENUCONFIG_ARGS); \
 > elif command -v python >/dev/null 2>&1; then \
->     python scripts/menuconfig.py $(MENUCONFIG_ARGS); \
+>     python scripts/menuconfig.py $(MENUCONFIG_PRESET_ARG) $(MENUCONFIG_ARGS); \
 > else \
 >     echo "python3/python not found"; \
 >     exit 1; \
@@ -75,9 +77,9 @@ menuconfig:
 
 menuconfig-gui:
 > @if command -v $(PYTHON) >/dev/null 2>&1; then \
->     $(PYTHON) scripts/menuconfig.py --gui $(MENUCONFIG_ARGS); \
+>     $(PYTHON) scripts/menuconfig.py --gui $(MENUCONFIG_PRESET_ARG) $(MENUCONFIG_ARGS); \
 > elif command -v python >/dev/null 2>&1; then \
->     python scripts/menuconfig.py --gui $(MENUCONFIG_ARGS); \
+>     python scripts/menuconfig.py --gui $(MENUCONFIG_PRESET_ARG) $(MENUCONFIG_ARGS); \
 > else \
 >     echo "python3/python not found"; \
 >     exit 1; \
@@ -145,3 +147,7 @@ help:
 > @echo "  make configure CMAKE_EXTRA_ARGS='-DLIMINE_SKIP_CONFIGURE=1 -DOBJCOPY_FOR_TARGET=objcopy'"
 > @echo "Direct passthrough is also supported:"
 > @echo "  make run LIMINE_SKIP_CONFIGURE=1"
+> @echo "Preset examples:"
+> @echo "  make menuconfig MENUCONFIG_PRESET=full"
+> @echo "  make menuconfig MENUCONFIG_PRESET=minimal"
+> @echo "  make menuconfig-gui MENUCONFIG_PRESET=dev"
