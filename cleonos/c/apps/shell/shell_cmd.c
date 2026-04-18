@@ -5,6 +5,8 @@
 #define USH_COPY_MAX      65536U
 #define USH_PIPELINE_MAX_STAGES 8ULL
 #define USH_PIPE_CAPTURE_MAX   USH_COPY_MAX
+#define USH_PIPE_TMP_A "/temp/.ush_pipe_a.bin"
+#define USH_PIPE_TMP_B "/temp/.ush_pipe_b.bin"
 #define USH_SORT_MAX_LINES 4096ULL
 
 typedef struct ush_pipeline_stage {
@@ -2724,16 +2726,89 @@ static int ush_pipeline_parse(const char *line,
     return 1;
 }
 
-static int ush_pipeline_write_redirect(const ush_state *sh, const ush_pipeline_stage *stage, const char *data, u64 len) {
-    char abs_path[USH_PATH_MAX];
-    u64 ok;
+static int ush_pipeline_open_write_fd(const char *path, u64 flags, u64 *out_fd) {
+    u64 fd;
 
-    if (sh == (const ush_state *)0 || stage == (const ush_pipeline_stage *)0) {
+    if (path == (const char *)0 || out_fd == (u64 *)0) {
+        return 0;
+    }
+
+    fd = cleonos_sys_fd_open(path, flags, 0ULL);
+
+    if (fd == (u64)-1) {
+        return 0;
+    }
+
+    *out_fd = fd;
+    return 1;
+}
+
+static int ush_pipeline_read_path_into_buffer(const char *path, char *buffer, u64 buffer_size, u64 *out_len) {
+    u64 fd;
+    u64 total = 0ULL;
+    int truncated = 0;
+    char drain[256];
+
+    if (path == (const char *)0 || buffer == (char *)0 || buffer_size < 2ULL || out_len == (u64 *)0) {
+        return 0;
+    }
+
+    *out_len = 0ULL;
+    buffer[0] = '\0';
+
+    fd = cleonos_sys_fd_open(path, CLEONOS_O_RDONLY, 0ULL);
+
+    if (fd == (u64)-1) {
+        return 0;
+    }
+
+    for (;;) {
+        u64 got;
+        u64 room;
+
+        if (total + 1ULL < buffer_size) {
+            room = (buffer_size - 1ULL) - total;
+            got = cleonos_sys_fd_read(fd, buffer + total, room);
+        } else {
+            got = cleonos_sys_fd_read(fd, drain, (u64)sizeof(drain));
+            truncated = 1;
+        }
+
+        if (got == (u64)-1) {
+            (void)cleonos_sys_fd_close(fd);
+            return 0;
+        }
+
+        if (got == 0ULL) {
+            break;
+        }
+
+        if (total + got < buffer_size) {
+            total += got;
+        }
+    }
+
+    (void)cleonos_sys_fd_close(fd);
+    buffer[total] = '\0';
+    *out_len = total;
+
+    if (truncated != 0) {
+        ush_writeln("[pipe] input truncated");
+    }
+
+    return 1;
+}
+
+static int ush_pipeline_open_redirect_fd(const ush_state *sh, const ush_pipeline_stage *stage, u64 *out_fd) {
+    char abs_path[USH_PATH_MAX];
+    u64 flags = CLEONOS_O_WRONLY | CLEONOS_O_CREAT;
+
+    if (sh == (const ush_state *)0 || stage == (const ush_pipeline_stage *)0 || out_fd == (u64 *)0) {
         return 0;
     }
 
     if (stage->redirect_mode == 0) {
-        return 1;
+        return 0;
     }
 
     if (ush_resolve_path(sh, stage->redirect_path, abs_path, (u64)sizeof(abs_path)) == 0) {
@@ -2741,14 +2816,19 @@ static int ush_pipeline_write_redirect(const ush_state *sh, const ush_pipeline_s
         return 0;
     }
 
-    if (stage->redirect_mode == 1) {
-        ok = cleonos_sys_fs_write(abs_path, data, len);
-    } else {
-        ok = cleonos_sys_fs_append(abs_path, data, len);
+    if (ush_path_is_under_temp(abs_path) == 0) {
+        ush_writeln("redirect: path must be under /temp");
+        return 0;
     }
 
-    if (ok == 0ULL) {
-        ush_writeln("redirect: write failed");
+    if (stage->redirect_mode == 1) {
+        flags |= CLEONOS_O_TRUNC;
+    } else {
+        flags |= CLEONOS_O_APPEND;
+    }
+
+    if (ush_pipeline_open_write_fd(abs_path, flags, out_fd) == 0) {
+        ush_writeln("redirect: open failed");
         return 0;
     }
 
@@ -2762,12 +2842,12 @@ static int ush_execute_pipeline(ush_state *sh,
     ush_pipeline_stage stages[USH_PIPELINE_MAX_STAGES];
     u64 stage_count = 0ULL;
     u64 i;
-    const char *pipe_in = (const char *)0;
-    u64 pipe_in_len = 0ULL;
-    char *capture_out = ush_pipeline_capture_a;
-    u64 capture_len = 0ULL;
+    const char *pipe_input_path = (const char *)0;
+    char *pipe_input_buffer = ush_pipeline_capture_a;
+    u64 pipe_input_len = 0ULL;
     int known = 1;
     int success = 1;
+    int pipe_output_toggle = 0;
 
     if (out_known != (int *)0) {
         *out_known = 1;
@@ -2777,6 +2857,9 @@ static int ush_execute_pipeline(ush_state *sh,
         *out_success = 0;
     }
 
+    (void)cleonos_sys_fs_remove(USH_PIPE_TMP_A);
+    (void)cleonos_sys_fs_remove(USH_PIPE_TMP_B);
+
     if (ush_pipeline_parse(line, stages, USH_PIPELINE_MAX_STAGES, &stage_count) == 0) {
         return 0;
     }
@@ -2784,7 +2867,9 @@ static int ush_execute_pipeline(ush_state *sh,
     for (i = 0ULL; i < stage_count; i++) {
         int stage_known = 1;
         int stage_success = 0;
-        int mirror_to_tty = ((i + 1ULL) == stage_count && stages[i].redirect_mode == 0) ? 1 : 0;
+        int use_fd_output = 0;
+        u64 stage_fd = (u64)-1;
+        const char *stage_pipe_out = (const char *)0;
 
         if (i + 1ULL < stage_count && stages[i].redirect_mode != 0) {
             ush_writeln("pipe: redirection is only supported on final stage");
@@ -2793,13 +2878,51 @@ static int ush_execute_pipeline(ush_state *sh,
             break;
         }
 
-        ush_pipeline_set_stdin(pipe_in, pipe_in_len);
-        ush_output_capture_begin(capture_out, (u64)USH_PIPE_CAPTURE_MAX + 1ULL, mirror_to_tty);
-        (void)ush_execute_single_command(sh, stages[i].cmd, stages[i].arg, 0, &stage_known, &stage_success);
-        capture_len = ush_output_capture_end();
+        if (pipe_input_path != (const char *)0) {
+            if (ush_pipeline_read_path_into_buffer(pipe_input_path,
+                                                   pipe_input_buffer,
+                                                   (u64)USH_PIPE_CAPTURE_MAX + 1ULL,
+                                                   &pipe_input_len) == 0) {
+                ush_writeln("pipe: failed to read stage input");
+                success = 0;
+                break;
+            }
 
-        if (ush_output_capture_truncated() != 0) {
-            ush_writeln("[pipe] captured output truncated");
+            ush_pipeline_set_stdin(pipe_input_buffer, pipe_input_len);
+        } else {
+            ush_pipeline_set_stdin((const char *)0, 0ULL);
+        }
+
+        if (i + 1ULL < stage_count) {
+            stage_pipe_out = (pipe_output_toggle == 0) ? USH_PIPE_TMP_A : USH_PIPE_TMP_B;
+
+            if (ush_pipeline_open_write_fd(stage_pipe_out,
+                                           CLEONOS_O_WRONLY | CLEONOS_O_CREAT | CLEONOS_O_TRUNC,
+                                           &stage_fd) == 0) {
+                ush_writeln("pipe: failed to open temp stream");
+                success = 0;
+                break;
+            }
+
+            use_fd_output = 1;
+        } else if (stages[i].redirect_mode != 0) {
+            if (ush_pipeline_open_redirect_fd(sh, &stages[i], &stage_fd) == 0) {
+                success = 0;
+                break;
+            }
+
+            use_fd_output = 1;
+        }
+
+        if (use_fd_output != 0) {
+            ush_output_fd_begin(stage_fd, 0);
+        }
+
+        (void)ush_execute_single_command(sh, stages[i].cmd, stages[i].arg, 0, &stage_known, &stage_success);
+
+        if (use_fd_output != 0) {
+            ush_output_fd_end();
+            (void)cleonos_sys_fd_close(stage_fd);
         }
 
         if (stage_known == 0) {
@@ -2811,19 +2934,17 @@ static int ush_execute_pipeline(ush_state *sh,
             break;
         }
 
-        if (stages[i].redirect_mode != 0) {
-            if (ush_pipeline_write_redirect(sh, &stages[i], capture_out, capture_len) == 0) {
-                success = 0;
-                break;
-            }
+        if (i + 1ULL < stage_count) {
+            pipe_input_path = stage_pipe_out;
+            pipe_input_buffer = (pipe_input_buffer == ush_pipeline_capture_a) ? ush_pipeline_capture_b
+                                                                               : ush_pipeline_capture_a;
+            pipe_output_toggle = (pipe_output_toggle == 0) ? 1 : 0;
         }
-
-        pipe_in = capture_out;
-        pipe_in_len = capture_len;
-        capture_out = (capture_out == ush_pipeline_capture_a) ? ush_pipeline_capture_b : ush_pipeline_capture_a;
     }
 
     ush_pipeline_set_stdin((const char *)0, 0ULL);
+    (void)cleonos_sys_fs_remove(USH_PIPE_TMP_A);
+    (void)cleonos_sys_fs_remove(USH_PIPE_TMP_B);
 
     if (out_known != (int *)0) {
         *out_known = known;

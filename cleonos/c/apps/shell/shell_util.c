@@ -225,6 +225,9 @@ static u64 ush_out_capture_length = 0ULL;
 static int ush_out_capture_active = 0;
 static int ush_out_capture_mirror_tty = 1;
 static int ush_out_capture_truncated = 0;
+static u64 ush_out_fd = (u64)-1;
+static int ush_out_fd_active = 0;
+static int ush_out_fd_mirror_tty = 1;
 
 static void ush_output_capture_append(const char *text, u64 len) {
     u64 writable;
@@ -295,8 +298,21 @@ int ush_output_capture_truncated(void) {
     return ush_out_capture_truncated;
 }
 
+void ush_output_fd_begin(u64 fd, int mirror_to_tty) {
+    ush_out_fd = fd;
+    ush_out_fd_active = 1;
+    ush_out_fd_mirror_tty = (mirror_to_tty != 0) ? 1 : 0;
+}
+
+void ush_output_fd_end(void) {
+    ush_out_fd = (u64)-1;
+    ush_out_fd_active = 0;
+    ush_out_fd_mirror_tty = 1;
+}
+
 void ush_write(const char *text) {
     u64 len;
+    int should_write_tty = 1;
 
     if (text == (const char *)0) {
         return;
@@ -312,23 +328,45 @@ void ush_write(const char *text) {
         ush_output_capture_append(text, len);
 
         if (ush_out_capture_mirror_tty == 0) {
-            return;
+            should_write_tty = 0;
         }
     }
 
-    (void)cleonos_sys_tty_write(text, len);
+    if (ush_out_fd_active != 0 && ush_out_fd != (u64)-1) {
+        (void)cleonos_sys_fd_write(ush_out_fd, text, len);
+
+        if (ush_out_fd_mirror_tty == 0) {
+            should_write_tty = 0;
+        }
+    }
+
+    if (should_write_tty != 0) {
+        (void)cleonos_sys_tty_write(text, len);
+    }
 }
 
 void ush_write_char(char ch) {
+    int should_write_tty = 1;
+
     if (ush_out_capture_active != 0) {
         ush_output_capture_append(&ch, 1ULL);
 
         if (ush_out_capture_mirror_tty == 0) {
-            return;
+            should_write_tty = 0;
         }
     }
 
-    (void)cleonos_sys_tty_write_char(ch);
+    if (ush_out_fd_active != 0 && ush_out_fd != (u64)-1) {
+        (void)cleonos_sys_fd_write(ush_out_fd, &ch, 1ULL);
+
+        if (ush_out_fd_mirror_tty == 0) {
+            should_write_tty = 0;
+        }
+    }
+
+    if (should_write_tty != 0) {
+        (void)cleonos_sys_tty_write_char(ch);
+    }
 }
 
 void ush_writeln(const char *text) {
