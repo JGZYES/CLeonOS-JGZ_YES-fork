@@ -3,9 +3,11 @@ name: Code Style Check
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
   clang-format:
@@ -20,7 +22,32 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang-format
 
-      - name: Check C/C++ style
+      - name: Resolve base ref
+        id: base
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "base_ref=${{ github.event.pull_request.head.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base_ref=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Detect auto-fix capability
+        id: capability
+        shell: bash
+        run: |
+          set -euo pipefail
+          can_fix=false
+          if [[ "${{ github.event_name }}" == "push" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            can_fix=true
+          elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ]]; then
+            can_fix=true
+          fi
+          echo "can_fix=$can_fix" >> "$GITHUB_OUTPUT"
+
+      - name: Run clang-format and detect drift
+        id: format
         shell: bash
         run: |
           set -euo pipefail
@@ -33,6 +60,7 @@ jobs:
 
           if [[ ${#files[@]} -eq 0 ]]; then
             echo "No C/C++ files to check."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -40,11 +68,41 @@ jobs:
             clang-format -i "$f"
           done
 
-          if ! git diff --quiet -- "${files[@]}"; then
-            echo "Code style check failed. Please run clang-format on changed files."
-            echo ""
-            git diff -- "${files[@]}"
-            exit 1
+          if git diff --quiet -- "${files[@]}"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Code style check passed."
+            exit 0
           fi
 
-          echo "Code style check passed."
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "Style drift detected. Auto-fix patch:"
+          echo ""
+          git diff -- "${files[@]}"
+
+      - name: Create auto-fix PR
+        if: steps.format.outputs.changed == 'true' && steps.capability.outputs.can_fix == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "style: auto-format C/C++ sources with clang-format"
+          title: "style: auto-format C/C++ sources"
+          body: |
+            This PR was generated automatically by CI style check.
+
+            - Trigger: `${{ github.event_name }}`
+            - Base branch: `${{ steps.base.outputs.base_ref }}`
+            - Formatter: `clang-format`
+          branch: codex/style-autofix-${{ github.run_id }}-${{ github.run_attempt }}
+          base: ${{ steps.base.outputs.base_ref }}
+          delete-branch: true
+          labels: |
+            automated
+            style
+
+      - name: Fail when style drift cannot be auto-fixed
+        if: steps.format.outputs.changed == 'true' && steps.capability.outputs.can_fix != 'true'
+        shell: bash
+        run: |
+          echo "Style drift found, but this event does not have permission to auto-create a fix PR."
+          echo "Please run clang-format locally and push the result."
+          exit 1
