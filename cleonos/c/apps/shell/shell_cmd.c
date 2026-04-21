@@ -131,6 +131,10 @@ static int ush_cmd_help(void) {
     ush_writeln("  head [-n N] [file] / tail [-n N] [file]");
     ush_writeln("  wc [file] / cut -d <char> -f <N> [file] / uniq [file] / sort [file]");
     ush_writeln("  pwd");
+    ush_writeln("  version");
+    ush_writeln("  sview <file>     (text file preview)");
+    ush_writeln("  mkfile <file>    (create new file)");
+    ush_writeln("  nano <file>      (text editor)");
     ush_writeln("  cd [dir]");
     ush_writeln("  exec|run <path|name> [args...]");
     ush_writeln("  clear");
@@ -1445,6 +1449,191 @@ static int ush_cmd_pwd(const ush_state *sh) {
     return 1;
 }
 
+static int ush_cmd_version(void) {
+    ush_writeln("R-1-JGZ_YES");
+    return 1;
+}
+
+static int ush_cmd_sview(const ush_state *sh, const char *arg) {
+    char path[USH_PATH_MAX];
+    char buf[1024];
+    u64 fd;
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("sview: file path required");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("sview: invalid path");
+        return 0;
+    }
+
+    if (cleonos_sys_fs_stat_type(path) != 1ULL) {
+        ush_writeln("sview: file not found");
+        return 0;
+    }
+
+    fd = cleonos_sys_fd_open(path, CLEONOS_O_RDONLY, 0ULL);
+    if (fd == (u64)-1) {
+        ush_writeln("sview: open failed");
+        return 0;
+    }
+
+    for (;;) {
+        u64 got = cleonos_sys_fd_read(fd, buf, (u64)sizeof(buf));
+        u64 written_total = 0ULL;
+
+        if (got == (u64)-1) {
+            (void)cleonos_sys_fd_close(fd);
+            ush_writeln("sview: read failed");
+            return 0;
+        }
+
+        if (got == 0ULL) {
+            break;
+        }
+
+        while (written_total < got) {
+            u64 written = cleonos_sys_fd_write(1ULL, buf + written_total, got - written_total);
+            if (written == (u64)-1 || written == 0ULL) {
+                (void)cleonos_sys_fd_close(fd);
+                ush_writeln("sview: write failed");
+                return 0;
+            }
+            written_total += written;
+        }
+    }
+
+    (void)cleonos_sys_fd_close(fd);
+    return 1;
+}
+
+static int ush_cmd_mkfile(const ush_state *sh, const char *arg) {
+    static const char empty_data[1] = {'\0'};
+    char path[USH_PATH_MAX];
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("mkfile: file path required");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("mkfile: invalid path");
+        return 0;
+    }
+
+    if (ush_path_is_under_temp(path) == 0) {
+        ush_writeln("mkfile: target must be under /temp");
+        return 0;
+    }
+
+    if (cleonos_sys_fs_write(path, empty_data, 0ULL) == 0ULL) {
+        ush_writeln("mkfile: failed");
+        return 0;
+    }
+
+    return 1;
+}
+
+static int ush_cmd_nano(const ush_state *sh, const char *arg) {
+    char path[USH_PATH_MAX];
+    char buffer[4096];
+    u64 fd;
+    u64 size;
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("nano: file path required");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("nano: invalid path");
+        return 0;
+    }
+
+    if (ush_path_is_under_temp(path) == 0) {
+        ush_writeln("nano: target must be under /temp");
+        return 0;
+    }
+
+    fd = cleonos_sys_fd_open(path, CLEONOS_O_RDWR | CLEONOS_O_CREAT, 0ULL);
+    if (fd == (u64)-1) {
+        ush_writeln("nano: open failed");
+        return 0;
+    }
+
+    ush_writeln("nano text editor");
+    ush_writeln("Press Ctrl+X to exit, Ctrl+S to save");
+    ush_writeln("");
+
+    size = cleonos_sys_fd_read(fd, buffer, (u64)sizeof(buffer) - 1);
+    if (size == (u64)-1) {
+        (void)cleonos_sys_fd_close(fd);
+        ush_writeln("nano: read failed");
+        return 0;
+    }
+    buffer[size] = '\0';
+
+    ush_writeln("Current content:");
+    ush_writeln(buffer);
+    ush_writeln("");
+    ush_writeln("Enter new content (end with Ctrl+D):");
+
+    size = 0;
+    while (size < (u64)sizeof(buffer) - 1) {
+        char c;
+        u64 read = cleonos_sys_fd_read(0ULL, &c, 1ULL);
+        if (read == 0) {
+            continue;
+        }
+        if (c == 3) {
+            (void)cleonos_sys_fd_close(fd);
+            ush_writeln("\n^C");
+            ush_writeln("Exited without saving");
+            return 1;
+        }
+        if (c == 4 && size > 0) {
+            break;
+        }
+        if (c == 24) {
+            (void)cleonos_sys_fd_close(fd);
+            ush_writeln("\nExited without saving");
+            return 1;
+        }
+        if (c == 19) {
+            (void)cleonos_sys_fd_close(fd);
+            fd = cleonos_sys_fd_open(path, CLEONOS_O_RDWR | CLEONOS_O_TRUNC, 0ULL);
+            if (fd != (u64)-1) {
+                (void)cleonos_sys_fd_write(fd, buffer, size);
+                ush_writeln("\nSaved");
+            } else {
+                ush_writeln("\nSave failed");
+            }
+            continue;
+        }
+        if (c == '\r') {
+            continue;
+        }
+        if (c == '\b' && size > 0) {
+            size--;
+            continue;
+        }
+        buffer[size++] = c;
+    }
+    buffer[size] = '\0';
+
+    (void)cleonos_sys_fd_close(fd);
+    fd = cleonos_sys_fd_open(path, CLEONOS_O_RDWR | CLEONOS_O_TRUNC, 0ULL);
+    if (fd != (u64)-1) {
+        (void)cleonos_sys_fd_write(fd, buffer, size);
+        (void)cleonos_sys_fd_close(fd);
+    }
+
+    ush_writeln("\nFile saved");
+    return 1;
+}
+
 static int ush_cmd_cd(ush_state *sh, const char *arg) {
     const char *target = arg;
     char path[USH_PATH_MAX];
@@ -1889,27 +2078,9 @@ static void ush_fastfetch_print_u64(int plain, const char *key, u64 value) {
 
 static void ush_fastfetch_print_logo(int plain) {
     if (plain == 0) {
-        ush_writeln("\x1B[1;34m $$$$$$\\  $$\\                                      $$$$$$\\   $$$$$$\\  \x1B[0m");
-        ush_writeln("\x1B[1;36m$$  __$$\\ $$ |                                    $$  __$$\\ $$  __$$\\ \x1B[0m");
-        ush_writeln("\x1B[1;32m$$ /  \\__|$$ |       $$$$$$\\   $$$$$$\\  $$$$$$$\\  $$ /  $$ |$$ /  \\__|\x1B[0m");
-        ush_writeln("\x1B[1;33m$$ |      $$ |      $$  __$$\\ $$  __$$\\ $$  __$$\\ $$ |  $$ |\\$$$$$$\\  \x1B[0m");
-        ush_writeln("\x1B[1;31m$$ |      $$ |      $$$$$$$$ |$$ /  $$ |$$ |  $$ |$$ |  $$ | \\____$$\\ \x1B[0m");
-        ush_writeln("\x1B[1;35m$$ |  $$\\ $$ |      $$   ____|$$ |  $$ |$$ |  $$ |$$ |  $$ |$$\\   $$ |\x1B[0m");
-        ush_writeln("\x1B[1;94m\\$$$$$$  |$$$$$$$$\\ \\$$$$$$$\\ \\$$$$$$  |$$ |  $$ | $$$$$$  |\\$$$$$$  |\x1B[0m");
-        ush_writeln("\x1B[1;96m \\______/ \\________| \\_______| \\______/ \\__|  \\__| \\______/  \\______/ \x1B[0m");
-        ush_writeln("                                                                      ");
-        ush_writeln("                                                                      ");
+        ush_writeln("SunsetOS x86_64");
     } else {
-        ush_writeln(" $$$$$$\\  $$\\                                      $$$$$$\\   $$$$$$\\  ");
-        ush_writeln("$$  __$$\\ $$ |                                    $$  __$$\\ $$  __$$\\ ");
-        ush_writeln("$$ /  \\__|$$ |       $$$$$$\\   $$$$$$\\  $$$$$$$\\  $$ /  $$ |$$ /  \\__|");
-        ush_writeln("$$ |      $$ |      $$  __$$\\ $$  __$$\\ $$  __$$\\ $$ |  $$ |\\$$$$$$\\  ");
-        ush_writeln("$$ |      $$ |      $$$$$$$$ |$$ /  $$ |$$ |  $$ |$$ |  $$ | \\____$$\\ ");
-        ush_writeln("$$ |  $$\\ $$ |      $$   ____|$$ |  $$ |$$ |  $$ |$$ |  $$ |$$\\   $$ |");
-        ush_writeln("\\$$$$$$  |$$$$$$$$\\ \\$$$$$$$\\ \\$$$$$$  |$$ |  $$ | $$$$$$  |\\$$$$$$  |");
-        ush_writeln(" \\______/ \\________| \\_______| \\______/ \\__|  \\__| \\______/  \\______/ ");
-        ush_writeln("                                                                      ");
-        ush_writeln("                                                                      ");
+        ush_writeln("SunsetOS x86_64");
     }
 }
 
@@ -2502,6 +2673,14 @@ static int ush_execute_single_command(ush_state *sh, const char *cmd, const char
         success = ush_cmd_sort(sh, arg);
     } else if (ush_streq(cmd, "pwd") != 0) {
         success = ush_cmd_pwd(sh);
+    } else if (ush_streq(cmd, "version") != 0) {
+        success = ush_cmd_version();
+    } else if (ush_streq(cmd, "sview") != 0) {
+        success = ush_cmd_sview(sh, arg);
+    } else if (ush_streq(cmd, "mkfile") != 0) {
+        success = ush_cmd_mkfile(sh, arg);
+    } else if (ush_streq(cmd, "nano") != 0) {
+        success = ush_cmd_nano(sh, arg);
     } else if (ush_streq(cmd, "cd") != 0) {
         success = ush_cmd_cd(sh, arg);
     } else if (ush_streq(cmd, "exec") != 0 || ush_streq(cmd, "run") != 0) {

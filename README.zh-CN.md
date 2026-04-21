@@ -1,4 +1,4 @@
-# CLeonOS
+# SunsetOS
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -13,7 +13,7 @@
 - 用户态 ELF 应用模型，syscall ABI 使用 `int 0x80`
 - 用户 Shell + 外部命令 ELF（`ls`、`cat`、`grep`、`mkdir`、`cp`、`mv`、`rm` 等）
 - Shell 管道与重定向（`|`、`>`、`>>`）
-- 可选主机侧 CLeonOS-Wine 运行器（Python + Unicorn），位于 [`wine/`](wine)
+- 可选主机侧 SunsetOS-Wine 运行器（Python + Unicorn），位于 [`wine/`](wine)
 
 ## 仓库结构
 

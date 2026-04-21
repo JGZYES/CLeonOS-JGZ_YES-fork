@@ -269,7 +269,7 @@ static void ush_render_buf_append_text(char *out, u64 out_size, u64 *io_len, con
 }
 
 static void ush_render_buf_append_prompt(const ush_state *sh, char *out, u64 out_size, u64 *io_len) {
-    ush_render_buf_append_text(out, out_size, io_len, "\x1B[96mcleonos\x1B[0m(\x1B[92muser\x1B[0m");
+    ush_render_buf_append_text(out, out_size, io_len, "\x1B[96msunsetos\x1B[0m(\x1B[92muser\x1B[0m");
 
     if (sh == (const ush_state *)0) {
         ush_render_buf_append_text(out, out_size, io_len, ")> ");
@@ -471,10 +471,13 @@ static void ush_history_down(ush_state *sh) {
     ush_history_apply_current(sh);
 }
 
-static char ush_read_char_blocking(void) {
+static char ush_read_char_blocking(int *break_requested) {
     char ch = '\0';
 
     for (;;) {
+        if (break_requested != (int *)0 && *break_requested != 0) {
+            return '\0';
+        }
         if (cleonos_sys_fd_read(0ULL, &ch, 1ULL) == 1ULL) {
             return ch;
         }
@@ -496,7 +499,24 @@ void ush_read_line(ush_state *sh, char *out_line, u64 out_size) {
     ush_prompt(sh);
 
     for (;;) {
-        char ch = ush_read_char_blocking();
+        char ch = ush_read_char_blocking(&sh->break_requested);
+
+        if (sh->break_requested != 0) {
+            sh->break_requested = 0;
+            ush_write_char('^');
+            ush_write_char('C');
+            ush_write_char('\n');
+            sh->line[0] = '\0';
+            sh->line_len = 0;
+            sh->cursor = 0;
+            ush_reset_line(sh);
+            ush_prompt(sh);
+            return;
+        }
+
+        if (ch == '\0') {
+            continue;
+        }
 
         if (ch == '\r') {
             continue;

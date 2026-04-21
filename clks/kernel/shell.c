@@ -23,7 +23,7 @@
 #define CLKS_SHELL_INPUT_BUDGET 128U
 #define CLKS_SHELL_CLEAR_LINES 56U
 #define CLKS_SHELL_HISTORY_MAX 16U
-#define CLKS_SHELL_PROMPT_TEXT "cleonos> "
+#define CLKS_SHELL_PROMPT_TEXT "sunsetos> "
 
 static clks_bool clks_shell_ready = CLKS_FALSE;
 static char clks_shell_line[CLKS_SHELL_LINE_MAX];
@@ -1510,7 +1510,7 @@ void clks_shell_init(void) {
     clks_shell_ready = CLKS_TRUE;
 
     clks_shell_writeln("");
-    clks_shell_writeln("CLeonOS interactive shell ready");
+    clks_shell_writeln("SunsetOS interactive shell ready");
     clks_shell_writeln("type 'help' for commands");
     clks_shell_writeln("/temp is writable in kernel shell mode");
     clks_shell_prompt();

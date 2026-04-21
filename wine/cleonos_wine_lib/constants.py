@@ -7,7 +7,7 @@ MAX_IO_READ = 1 << 20
 DEFAULT_MAX_EXEC_DEPTH = 6
 FS_NAME_MAX = 96
 
-# CLeonOS syscall IDs from cleonos/c/include/cleonos_syscall.h
+# SunsetOS syscall IDs from cleonos/c/include/cleonos_syscall.h
 SYS_LOG_WRITE = 0
 SYS_TIMER_TICKS = 1
 SYS_TASK_COUNT = 2

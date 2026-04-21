@@ -70,27 +70,9 @@ static void ush_fastfetch_print_u64(int plain, const char *key, u64 value) {
 
 static void ush_fastfetch_print_logo(int plain) {
     if (plain == 0) {
-        ush_writeln("\x1B[1;34m $$$$$$\\  $$\\                                      $$$$$$\\   $$$$$$\\  \x1B[0m");
-        ush_writeln("\x1B[1;36m$$  __$$\\ $$ |                                    $$  __$$\\ $$  __$$\\ \x1B[0m");
-        ush_writeln("\x1B[1;32m$$ /  \\__|$$ |       $$$$$$\\   $$$$$$\\  $$$$$$$\\  $$ /  $$ |$$ /  \\__|\x1B[0m");
-        ush_writeln("\x1B[1;33m$$ |      $$ |      $$  __$$\\ $$  __$$\\ $$  __$$\\ $$ |  $$ |\\$$$$$$\\  \x1B[0m");
-        ush_writeln("\x1B[1;31m$$ |      $$ |      $$$$$$$$ |$$ /  $$ |$$ |  $$ |$$ |  $$ | \\____$$\\ \x1B[0m");
-        ush_writeln("\x1B[1;35m$$ |  $$\\ $$ |      $$   ____|$$ |  $$ |$$ |  $$ |$$ |  $$ |$$\\   $$ |\x1B[0m");
-        ush_writeln("\x1B[1;94m\\$$$$$$  |$$$$$$$$\\ \\$$$$$$$\\ \\$$$$$$  |$$ |  $$ | $$$$$$  |\\$$$$$$  |\x1B[0m");
-        ush_writeln("\x1B[1;96m \\______/ \\________| \\_______| \\______/ \\__|  \\__| \\______/  \\______/ \x1B[0m");
-        ush_writeln("                                                                      ");
-        ush_writeln("                                                                      ");
+        ush_writeln("");
     } else {
-        ush_writeln(" $$$$$$\\  $$\\                                      $$$$$$\\   $$$$$$\\  ");
-        ush_writeln("$$  __$$\\ $$ |                                    $$  __$$\\ $$  __$$\\ ");
-        ush_writeln("$$ /  \\__|$$ |       $$$$$$\\   $$$$$$\\  $$$$$$$\\  $$ /  $$ |$$ /  \\__|");
-        ush_writeln("$$ |      $$ |      $$  __$$\\ $$  __$$\\ $$  __$$\\ $$ |  $$ |\\$$$$$$\\  ");
-        ush_writeln("$$ |      $$ |      $$$$$$$$ |$$ /  $$ |$$ |  $$ |$$ |  $$ | \\____$$\\ ");
-        ush_writeln("$$ |  $$\\ $$ |      $$   ____|$$ |  $$ |$$ |  $$ |$$ |  $$ |$$\\   $$ |");
-        ush_writeln("\\$$$$$$  |$$$$$$$$\\ \\$$$$$$$\\ \\$$$$$$  |$$ |  $$ | $$$$$$  |\\$$$$$$  |");
-        ush_writeln(" \\______/ \\________| \\_______| \\______/ \\__|  \\__| \\______/  \\______/ ");
-        ush_writeln("                                                                      ");
-        ush_writeln("                                                                      ");
+        ush_writeln("");
     }
 }
 
@@ -136,7 +118,7 @@ static int ush_cmd_fastfetch(const char *arg) {
     ush_fastfetch_print_logo(plain);
     ush_write_char('\n');
 
-    ush_fastfetch_print_text(plain, "OS", "CLeonOS x86_64");
+    ush_fastfetch_print_text(plain, "OS", "SunsetOS x86_64");
     ush_fastfetch_print_text(plain, "Shell", "User Shell (/shell/shell.elf)");
     ush_fastfetch_print_u64(plain, "PID", cleonos_sys_getpid());
     ush_fastfetch_print_u64(plain, "UptimeTicks", cleonos_sys_timer_ticks());

@@ -1,4 +1,4 @@
-# CLeonOS
+# SunsetOS
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -13,7 +13,7 @@ Experimental x86_64 operating system project with a C kernel, Rust-assisted runt
 - User-space ELF app model with syscall ABI (`int 0x80`)
 - User shell with external command apps (`ls`, `cat`, `grep`, `mkdir`, `cp`, `mv`, `rm`, etc.)
 - Pipe and redirection support in user shell (`|`, `>`, `>>`)
-- Optional host-side CLeonOS-Wine runner (Python + Unicorn) in [`wine/`](wine)
+- Optional host-side SunsetOS-Wine runner (Python + Unicorn) in [`wine/`](wine)
 
 ## Repository Layout
 
@@ -25,7 +25,7 @@ Experimental x86_64 operating system project with a C kernel, Rust-assisted runt
 |- configs/              # Boot configuration (Limine)
 |- cmake/                # Shared CMake scripts (tool checks, logging, limine setup)
 |- docs/                 # Stage documents and syscall reference
-|- wine/                 # Host runner for CLeonOS user ELF (no full VM required)
+|- wine/                 # Host runner for SunsetOS user ELF (no full VM required)
 |- CMakeLists.txt        # Main build definition
 |- Makefile              # Developer-friendly wrapper around CMake targets
 ```

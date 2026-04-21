@@ -503,7 +503,7 @@ set(RAMDISK_SYSTEM_APPS)
 set(RAMDISK_ROOT_APPS)
 
 set(USER_SHELL_COMMAND_APPS
-    help args ls cat grep head tail wc cut uniq sort pwd cd exec pid spawn wait sleep yield
+    help args ls cat grep head tail wc cut uniq sort pwd version sview mkfile nano cd exec pid spawn wait sleep yield
     bg fg jobs kill ps top
     procstat sysstat
     shutdown restart exit clear ansi ansitest wavplay fastfetch memstat fsstat taskstat userstat

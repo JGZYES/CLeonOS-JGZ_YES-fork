@@ -4,12 +4,12 @@ import argparse
 import sys
 
 from .constants import DEFAULT_MAX_EXEC_DEPTH
-from .runner import CLeonOSWineNative, resolve_elf_target, resolve_rootfs
+from .runner import SunsetOSWineNative, resolve_elf_target, resolve_rootfs
 from .state import SharedKernelState
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="CLeonOS-Wine: run CLeonOS ELF with Unicorn.")
+    parser = argparse.ArgumentParser(description="SunsetOS-Wine: run SunsetOS ELF with Unicorn.")
     parser.add_argument("elf", help="Target ELF path. Supports /guest/path or host file path.")
     parser.add_argument("--rootfs", help="Rootfs directory (default: build/x86_64/ramdisk_root).")
     parser.add_argument("--no-kbd", action="store_true", help="Disable host keyboard input pump.")
@@ -35,7 +35,7 @@ def main() -> int:
         print(f"[WINE] guest={guest_path}", file=sys.stderr)
 
     state = SharedKernelState()
-    runner = CLeonOSWineNative(
+    runner = SunsetOSWineNative(
         elf_path=elf_path,
         rootfs=rootfs,
         guest_path_hint=guest_path,

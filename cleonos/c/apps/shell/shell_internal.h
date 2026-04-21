@@ -59,6 +59,7 @@ typedef struct ush_state {
     u64 cmd_unknown;
     int exit_requested;
     u64 exit_code;
+    int break_requested;
 } ush_state;
 
 typedef struct ush_cmd_ctx {

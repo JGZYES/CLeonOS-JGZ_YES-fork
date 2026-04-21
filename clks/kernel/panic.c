@@ -591,7 +591,7 @@ CLKS_NORETURN void clks_panic(const char *reason) {
     clks_panic_active = CLKS_TRUE;
     clks_panic_capture_context(&rip, &rbp, &rsp);
 
-    clks_panic_serial_write_line("[PANIC] CLeonOS KERNEL PANIC");
+    clks_panic_serial_write_line("[PANIC] SunsetOS KERNEL PANIC");
 
     if (reason != CLKS_NULL) {
         clks_panic_serial_write_line(reason);
@@ -600,7 +600,7 @@ CLKS_NORETURN void clks_panic(const char *reason) {
     if (clks_panic_console_init(&console) == CLKS_TRUE) {
         clks_fb_clear(CLKS_PANIC_BG);
 
-        clks_panic_console_write(&console, "CLeonOS KERNEL PANIC\n");
+        clks_panic_console_write(&console, "SunsetOS KERNEL PANIC\n");
         clks_panic_console_write(&console, "====================\n\n");
 
         if (reason != CLKS_NULL) {
@@ -646,7 +646,7 @@ CLKS_NORETURN void clks_panic_exception(const char *name, u64 vector, u64 error_
     if (clks_panic_console_init(&console) == CLKS_TRUE) {
         clks_fb_clear(CLKS_PANIC_BG);
 
-        clks_panic_console_write(&console, "CLeonOS KERNEL PANIC\n");
+        clks_panic_console_write(&console, "SunsetOS KERNEL PANIC\n");
         clks_panic_console_write(&console, "====================\n\n");
         clks_panic_console_write(&console, "TYPE: CPU EXCEPTION\n");
 

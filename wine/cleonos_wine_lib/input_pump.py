@@ -21,7 +21,7 @@ class InputPump:
             return
         if not sys.stdin or not hasattr(sys.stdin, "isatty") or not sys.stdin.isatty():
             return
-        self._thread = threading.Thread(target=self._run, name="cleonos-wine-input", daemon=True)
+        self._thread = threading.Thread(target=self._run, name="sunsetos-wine-input", daemon=True)
         self._thread.start()
 
     def stop(self) -> None:

@@ -309,11 +309,11 @@ void ush_writeln(const char *text) {
 
 void ush_prompt(const ush_state *sh) {
     if (sh == (const ush_state *)0) {
-        ush_write("\x1B[96mcleonos\x1B[0m(\x1B[92muser\x1B[0m)> ");
+        ush_write("\x1B[96msunsetos\x1B[0m(\x1B[92muser\x1B[0m)> ");
         return;
     }
 
-    ush_write("\x1B[96mcleonos\x1B[0m(\x1B[92muser\x1B[0m:");
+    ush_write("\x1B[96msunsetos\x1B[0m(\x1B[92muser\x1B[0m:");
     ush_write("\x1B[93m");
     ush_write(sh->cwd);
     ush_write("\x1B[0m)> ");

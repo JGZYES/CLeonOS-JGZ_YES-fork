@@ -9,6 +9,10 @@ static int ush_cmd_help(void) {
     ush_writeln("  head [-n N] [file] / tail [-n N] [file]");
     ush_writeln("  wc [file] / cut -d <char> -f <N> [file] / uniq [file] / sort [file]");
     ush_writeln("  pwd");
+    ush_writeln("  version");
+    ush_writeln("  sview <file>     (text file preview)");
+    ush_writeln("  mkfile <file>    (create new file)");
+    ush_writeln("  nano <file>      (text editor)");
     ush_writeln("  cd [dir]");
     ush_writeln("  exec|run <path|name> [args...]");
     ush_writeln("  clear");

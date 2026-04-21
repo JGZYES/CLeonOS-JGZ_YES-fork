@@ -133,7 +133,7 @@ EXEC_ITEM_MAX = 128
 EXEC_STATUS_SIGNAL_FLAG = 1 << 63
 
 
-class CLeonOSWineNative:
+class SunsetOSWineNative:
     def __init__(
         self,
         elf_path: Path,
@@ -788,7 +788,7 @@ class CLeonOSWineNative:
         self.state.set_proc_cmdline(child_pid, argv_items, env_items)
         self.state.set_proc_fault(child_pid, 0, 0, 0, 0)
 
-        child = CLeonOSWineNative(
+        child = SunsetOSWineNative(
             elf_path=host_path,
             rootfs=self.rootfs,
             guest_path_hint=guest_path,
@@ -1120,7 +1120,7 @@ def resolve_rootfs(path_arg: Optional[str]) -> Path:
 
 
 def _guest_to_host_for_resolve(rootfs: Path, guest_path: str) -> Optional[Path]:
-    norm = CLeonOSWineNative._normalize_guest_path(guest_path)
+    norm = SunsetOSWineNative._normalize_guest_path(guest_path)
     if norm == "/":
         return rootfs
 
@@ -1157,7 +1157,7 @@ def resolve_elf_target(elf_arg: str, rootfs: Path) -> Tuple[Path, str]:
             guest_path = "/" + host_path.name
         return host_path, guest_path
 
-    guest_path = CLeonOSWineNative._normalize_guest_path(elf_arg)
+    guest_path = SunsetOSWineNative._normalize_guest_path(elf_arg)
     host_path = _guest_to_host_for_resolve(rootfs, guest_path)
     if host_path is None:
         raise FileNotFoundError(f"ELF not found as host path or guest path: {elf_arg}")
